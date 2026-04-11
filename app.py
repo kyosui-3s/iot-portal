@@ -368,7 +368,7 @@ def fetch_page():
     result_html = ''
     if url:
         try:
-            req = urllib.request.Request(url, headers={{'User-Agent': 'IoT-Portal/1.0'}})
+            req = urllib.request.Request(url, headers={'User-Agent': 'IoT-Portal/1.0'})
             resp = urllib.request.urlopen(req, timeout=5)
             body = resp.read(4096).decode('utf-8', errors='replace')
             import html as html_mod
@@ -408,7 +408,7 @@ def download_file():
     try:
         with open(filepath, 'rb') as f:
             content = f.read()
-        return Response(content, mimetype='application/octet-stream', headers={{'Content-Disposition': f'attachment; filename={filename}'}})
+        return Response(content, mimetype='application/octet-stream', headers={'Content-Disposition': f'attachment; filename={filename}'})
     except Exception as e:
         return f'<html><body><h1>エラー</h1><pre>File: {filepath}\nError: {e}</pre></body></html>', 404, {{'Content-Type': 'text/html'}}
 
