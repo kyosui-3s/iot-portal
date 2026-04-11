@@ -64,6 +64,25 @@ def index():
 def spa_catch_all(path):
     return send_from_directory('static', 'index.html')
 
+# ─────────── sitemap / robots ───────────
+@app.route('/sitemap.xml')
+def sitemap():
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>http://sub.3sec-demo.com/</loc></url>
+  <url><loc>http://sub.3sec-demo.com/graphql</loc></url>
+  <url><loc>http://sub.3sec-demo.com/devices/search</loc></url>
+  <url><loc>http://sub.3sec-demo.com/tools/ping</loc></url>
+  <url><loc>http://sub.3sec-demo.com/tools/fetch</loc></url>
+  <url><loc>http://sub.3sec-demo.com/download</loc></url>
+  <url><loc>http://sub.3sec-demo.com/redirect?url=/</loc></url>
+</urlset>"""
+    return Response(xml, mimetype='application/xml')
+
+@app.route('/robots.txt')
+def robots():
+    return Response("User-agent: *\nAllow: /\nSitemap: http://sub.3sec-demo.com/sitemap.xml\n", mimetype='text/plain')
+
 # ─────────── REST API: ログイン ───────────
 @app.route('/api/login', methods=['POST', 'OPTIONS'])
 def api_login():
