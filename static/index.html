@@ -244,6 +244,146 @@ const DevicesPage = {
 }
 
 /* ════════════════════════════════════════
+   DEVICE DETAIL PAGE - 赤系アクセント + 詳細情報（手動巡回用）
+   特定のデバイスID（例: SEN-A0421）を入力しないと到達できない
+   ════════════════════════════════════════ */
+const DeviceDetailPage = {
+  template: `
+  <div class="min-h-screen bg-slate-50">
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div class="flex items-center gap-6">
+          <span class="font-bold text-red-700">🔍 IoT Portal</span>
+          <nav class="flex gap-4 text-sm">
+            <router-link to="/app/dashboard" class="text-gray-500 hover:text-gray-800">ダッシュボード</router-link>
+            <router-link to="/app/devices" class="text-gray-500 hover:text-gray-800">デバイス検索</router-link>
+            <span class="text-red-600 font-semibold border-b-2 border-red-500 pb-0.5">デバイス詳細</span>
+            <router-link to="/app/contact" class="text-gray-500 hover:text-gray-800">お問い合わせ</router-link>
+          </nav>
+        </div>
+      </div>
+    </header>
+    <main class="max-w-4xl mx-auto px-6 py-8">
+      <!-- デバイスID入力フォーム -->
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+        <h1 class="text-xl font-bold text-gray-900 mb-2">デバイス詳細検索</h1>
+        <p class="text-gray-500 text-sm mb-4">管理対象デバイスのIDを入力して詳細情報を表示します</p>
+        <div class="flex gap-3">
+          <input v-model="deviceId" @keyup.enter="fetchDevice" type="text" placeholder="デバイスID を入力（例: 1）" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
+          <button @click="fetchDevice" class="px-6 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition">検索</button>
+        </div>
+      </div>
+
+      <!-- エラー表示 -->
+      <div v-if="errorHtml" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" v-html="errorHtml"></div>
+
+      <!-- デバイス詳細 -->
+      <div v-if="device" class="space-y-6">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-100 bg-red-50">
+            <h2 class="font-bold text-red-800">{{device.name}}</h2>
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium" :class="device.status==='online'?'bg-green-100 text-green-700':device.status==='warning'?'bg-amber-100 text-amber-700':'bg-gray-200 text-gray-600'">{{device.status}}</span>
+          </div>
+          <table class="w-full text-sm">
+            <tr class="border-b border-gray-50"><th class="text-left px-6 py-3 bg-gray-50 text-gray-600 w-40">ID</th><td class="px-6 py-3">{{device.id}}</td></tr>
+            <tr class="border-b border-gray-50"><th class="text-left px-6 py-3 bg-gray-50 text-gray-600">種別</th><td class="px-6 py-3">{{device.type}}</td></tr>
+            <tr class="border-b border-gray-50"><th class="text-left px-6 py-3 bg-gray-50 text-gray-600">設置場所</th><td class="px-6 py-3">{{device.location}}</td></tr>
+            <tr class="border-b border-gray-50"><th class="text-left px-6 py-3 bg-gray-50 text-gray-600">IPアドレス</th><td class="px-6 py-3 font-mono">{{device.ip_address}}</td></tr>
+            <tr><th class="text-left px-6 py-3 bg-gray-50 text-gray-600">ファームウェア</th><td class="px-6 py-3">{{device.firmware}}</td></tr>
+          </table>
+        </div>
+
+        <!-- ネットワーク診断（OSコマンドインジェクション） -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <h3 class="font-semibold text-gray-800 mb-4">ネットワーク診断</h3>
+          <p class="text-gray-500 text-sm mb-3">デバイスへの疎通確認を行います</p>
+          <div class="flex gap-3 mb-4">
+            <input v-model="pingHost" type="text" :placeholder="device.ip_address" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
+            <button @click="doPing" class="px-6 py-2.5 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Ping実行</button>
+          </div>
+          <pre v-if="pingResult" class="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-auto max-h-48 font-mono">{{pingResult}}</pre>
+        </div>
+
+        <!-- 外部URL取得（SSRF） -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <h3 class="font-semibold text-gray-800 mb-4">ファームウェア更新チェック</h3>
+          <p class="text-gray-500 text-sm mb-3">ベンダーサイトから最新ファームウェア情報を取得します</p>
+          <div class="flex gap-3 mb-4">
+            <input v-model="fetchUrl" type="text" placeholder="https://vendor.example.com/firmware/latest.json" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
+            <button @click="doFetch" class="px-6 py-2.5 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">取得</button>
+          </div>
+          <pre v-if="fetchResult" class="bg-gray-50 border border-gray-200 p-4 rounded-lg text-xs overflow-auto max-h-48 font-mono">{{fetchResult}}</pre>
+        </div>
+      </div>
+
+      <!-- 未検索時 -->
+      <div v-if="!device && !errorHtml" class="text-center py-20 text-gray-400">
+        <p class="text-4xl mb-4">🔍</p>
+        <p>デバイスIDを入力して検索してください</p>
+      </div>
+    </main>
+  </div>`,
+  setup() {
+    const route = VueRouter.useRoute()
+    const deviceId = ref('')
+    const device = ref(null)
+    const errorHtml = ref('')
+    const pingHost = ref('')
+    const pingResult = ref('')
+    const fetchUrl = ref('')
+    const fetchResult = ref('')
+
+    async function fetchDevice() {
+      if (!deviceId.value) return
+      errorHtml.value = ''
+      device.value = null
+      pingResult.value = ''
+      fetchResult.value = ''
+      const res = await fetch('/api/device/' + deviceId.value)
+      const json = await res.json()
+      if (json.error) {
+        errorHtml.value = json.error
+      } else {
+        device.value = json
+        pingHost.value = json.ip_address || ''
+      }
+    }
+
+    async function doPing() {
+      const host = pingHost.value || '127.0.0.1'
+      const res = await fetch('/graphql', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({query: '{ ping(host: "' + host + '") { host output } }'})
+      })
+      const json = await res.json()
+      pingResult.value = json.data?.ping?.output || 'Error'
+    }
+
+    async function doFetch() {
+      if (!fetchUrl.value) return
+      const res = await fetch('/graphql', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({query: '{ fetch_url(url: "' + fetchUrl.value + '") { url status body } }'})
+      })
+      const json = await res.json()
+      const r = json.data?.fetch_url
+      fetchResult.value = r ? 'Status: ' + r.status + '\n\n' + r.body : 'Error'
+    }
+
+    onMounted(() => {
+      if (route.query.id) {
+        deviceId.value = route.query.id
+        fetchDevice()
+      }
+    })
+
+    return { deviceId, device, errorHtml, pingHost, pingResult, fetchUrl, fetchResult, fetchDevice, doPing, doFetch }
+  }
+}
+
+/* ════════════════════════════════════════
    CONTACT PAGE - ティール系 + フォーム
    ════════════════════════════════════════ */
 const ContactPage = {
@@ -306,6 +446,7 @@ const routes = [
   { path: '/', component: LoginPage },
   { path: '/app/dashboard', component: DashboardPage },
   { path: '/app/devices', component: DevicesPage },
+  { path: '/app/device', component: DeviceDetailPage },
   { path: '/app/contact', component: ContactPage },
 ]
 

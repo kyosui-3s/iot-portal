@@ -290,6 +290,21 @@ def api_inquiry():
     conn.close()
     return jsonify({'success': True, 'message': 'お問い合わせを受け付けました'})
 
+# ─────────── REST API: デバイス詳細（手動巡回用・Critical脆弱性） ───────────
+@app.route('/api/device/<device_id>')
+def api_device_detail(device_id):
+    # VULN: SQL インジェクション - パスパラメータを直接SQLに組み込み
+    sql = "SELECT * FROM devices WHERE id=" + device_id
+    try:
+        conn = get_db()
+        row = conn.execute(sql).fetchone()
+        conn.close()
+        if row:
+            return jsonify(dict(row))
+        return jsonify({'error': f'デバイスが見つかりません (ID: {device_id})<br>実行SQL: {sql}'}), 404
+    except Exception as e:
+        return jsonify({'error': f'<strong>Database Error</strong>: {str(e)}<br>SQL: {sql}<br>入力値: {device_id}'}), 500
+
 # VULN: オープンリダイレクト
 @app.route('/redirect')
 def open_redirect():
