@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>IoT Device Management Portal - Login</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="login-body">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4 col-md-offset-4">
+                <div class="login-panel panel panel-primary">
+                    <div class="panel-heading">
+                        <h3 class="panel-title"><i class="glyphicon glyphicon-cloud"></i> IoT Portal Login</h3>
+                    </div>
+                    <div class="panel-body">
+                        <div id="login-error" class="alert alert-danger" style="display:none;"></div>
+                        <form id="loginForm">
+                            <fieldset>
+                                <div class="form-group">
+                                    <label>Email Address</label>
+                                    <input class="form-control" placeholder="admin@3sec-demo.com" name="email" id="email" type="email" autofocus>
+                                </div>
+                                <div class="form-group">
+                                    <label>Password</label>
+                                    <input class="form-control" placeholder="Password" name="password" id="password" type="password">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">Login</button>
+                            </fieldset>
+                        </form>
+                        <hr>
+                        <p class="text-muted text-center small">3sec IoT Management System v1.0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script>
+    $(function(){
+        $('#loginForm').on('submit', function(e){
+            e.preventDefault();
+            var email = $('#email').val();
+            var password = $('#password').val();
+            $.ajax({
+                url: '/api/login',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({email: email, password: password}),
+                success: function(res){
+                    if(res.success){
+                        localStorage.setItem('user', JSON.stringify(res.user));
+                        window.location.href = '/dashboard.html';
+                    }
+                },
+                error: function(xhr){
+                    var msg = 'Login failed';
+                    try { msg = JSON.parse(xhr.responseText).error; } catch(e){}
+                    $('#login-error').html(msg).show();
+                }
+            });
+        });
+        if(localStorage.getItem('user')){
+            window.location.href = '/dashboard.html';
+        }
+    });
+    </script>
+</body>
+</html>
