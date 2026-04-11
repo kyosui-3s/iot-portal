@@ -355,7 +355,7 @@ def devices_search_page():
 </form>
 <p class="text-muted" style="margin-top:10px">検索キーワード: {q}</p>
 {result_html}
-<hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
+<hr><p><a href="/">トップへ</a> | <a href="/devices/search">デバイス検索</a> | <a href="/tools/ping">ネットワーク診断</a> | <a href="/tools/fetch">FW更新チェック</a> | <a href="/download">ダウンロード</a></p>
 </div></body></html>''', 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 # VULN: OSコマンドインジェクション - GETパラメータ経由
@@ -377,7 +377,7 @@ def ping_page():
 <span class="input-group-btn"><button class="btn btn-primary" type="submit">Ping実行</button></span></div>
 </form>
 {result_html}
-<hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
+<hr><p><a href="/">トップへ</a> | <a href="/devices/search">デバイス検索</a> | <a href="/tools/ping">ネットワーク診断</a> | <a href="/tools/fetch">FW更新チェック</a> | <a href="/download">ダウンロード</a></p>
 </div></body></html>''', 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 # VULN: SSRF - GETパラメータで任意URLにアクセス
@@ -405,7 +405,7 @@ def fetch_page():
 <span class="input-group-btn"><button class="btn btn-primary" type="submit">取得</button></span></div>
 </form>
 {result_html}
-<hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
+<hr><p><a href="/">トップへ</a> | <a href="/devices/search">デバイス検索</a> | <a href="/tools/ping">ネットワーク診断</a> | <a href="/tools/fetch">FW更新チェック</a> | <a href="/download">ダウンロード</a></p>
 </div></body></html>''', 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 # VULN: パストラバーサル - ファイルダウンロード
@@ -421,7 +421,7 @@ def download_file():
 <h2>ファームウェアダウンロード</h2>
 <ul><li><a href="/download?file=firmware_v2.1.3.bin">firmware_v2.1.3.bin</a></li>
 <li><a href="/download?file=firmware_v2.0.1.bin">firmware_v2.0.1.bin</a></li></ul>
-<hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
+<hr><p><a href="/">トップへ</a> | <a href="/devices/search">デバイス検索</a> | <a href="/tools/ping">ネットワーク診断</a> | <a href="/tools/fetch">FW更新チェック</a> | <a href="/download">ダウンロード</a></p>
 </div></body></html>''', 200, {'Content-Type': 'text/html; charset=utf-8'}
     filepath = os.path.join(os.path.dirname(__file__), 'firmware', filename)
     try:
