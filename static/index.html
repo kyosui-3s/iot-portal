@@ -14,23 +14,16 @@
 <!-- backup: rsync -az root@10.0.1.30:/opt/iot-portal/ /mnt/nfs/backup/ -->
 <body class="bg-gray-50">
 <div id="app"></div>
-<!-- クローラー用ナビゲーション（認証不要ページ） -->
-<nav id="crawler-nav" style="padding:20px;max-width:800px;margin:0 auto">
-  <h3 style="font-size:16px;color:#1a3d6e;margin-bottom:12px">IoT Portal - メニュー</h3>
-  <ul style="list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:8px">
-    <li><a href="/devices/search" style="display:inline-block;padding:8px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;color:#166534;font-size:13px;text-decoration:none">🔍 デバイス検索</a></li>
-    <li><a href="/tools/ping" style="display:inline-block;padding:8px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;color:#1e40af;font-size:13px;text-decoration:none">🌐 ネットワーク診断</a></li>
-    <li><a href="/tools/fetch" style="display:inline-block;padding:8px 16px;background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;color:#92400e;font-size:13px;text-decoration:none">📦 FW更新チェック</a></li>
-    <li><a href="/download" style="display:inline-block;padding:8px 16px;background:#fce7f3;border:1px solid #f9a8d4;border-radius:6px;color:#9d174d;font-size:13px;text-decoration:none">⬇️ ダウンロード</a></li>
-    <li><a href="/redirect?url=/" style="display:inline-block;padding:8px 16px;background:#f3e8ff;border:1px solid #d8b4fe;border-radius:6px;color:#6b21a8;font-size:13px;text-decoration:none">🔗 リダイレクト</a></li>
-    <li><a href="/graphql" style="display:inline-block;padding:8px 16px;background:#e0e7ff;border:1px solid #a5b4fc;border-radius:6px;color:#3730a3;font-size:13px;text-decoration:none">⚡ GraphQL API</a></li>
-  </ul>
-</nav>
-<script>
-// ログイン後はクローラー用ナビを非表示にする
-if(location.hash && location.hash !== '#/') document.getElementById('crawler-nav').style.display='none';
-window.addEventListener('hashchange', function(){ document.getElementById('crawler-nav').style.display = (location.hash && location.hash !== '#/') ? 'none' : ''; });
-</script>
+<!-- サイトフッター（常時表示・クローラーが辿れるリンク） -->
+<footer style="border-top:1px solid #e5e7eb;padding:16px 20px;text-align:center;font-size:12px;color:#9ca3af;margin-top:20px">
+  <p>&copy; 2025 3sec Technologies, Inc. |
+    <a href="/devices/search" style="color:#6b7280;margin:0 4px">デバイス検索</a> |
+    <a href="/tools/ping" style="color:#6b7280;margin:0 4px">ネットワーク診断</a> |
+    <a href="/tools/fetch" style="color:#6b7280;margin:0 4px">FW更新チェック</a> |
+    <a href="/download" style="color:#6b7280;margin:0 4px">ダウンロード</a> |
+    <a href="/graphql" style="color:#6b7280;margin:0 4px">API</a>
+  </p>
+</footer>
 
 <script>
 const { createApp, ref, reactive, computed, onMounted } = Vue
@@ -115,7 +108,7 @@ const DashboardPage = {
         <router-link to="/app/devices" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-gray-800 text-sm">📱 デバイス検索</router-link>
         <router-link to="/app/contact" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-gray-800 text-sm">✉️ お問い合わせ</router-link>
       </nav>
-      <button @click="logout" class="text-gray-500 hover:text-gray-300 text-xs">← ログアウト</button>
+      <form @submit.prevent="logout" style="margin:0"><button type="submit" class="text-gray-500 hover:text-gray-300 text-xs bg-transparent border-0 cursor-pointer p-0">← ログアウト</button></form>
     </aside>
     <!-- メイン -->
     <main class="flex-1 p-8">
