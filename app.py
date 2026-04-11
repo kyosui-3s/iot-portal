@@ -1,11 +1,14 @@
 import sqlite3
 import os
-from flask import Flask, request, redirect, Response
+import json
+import subprocess
+import urllib.request
+from flask import Flask, request, redirect, Response, jsonify, send_from_directory
 
-app = Flask(__name__)
-DB_PATH = '/opt/iot-portal/iot_portal.db'
+app = Flask(__name__, static_folder='static', static_url_path='')
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), 'iot_portal.db'))
 
-# --------------- Database ---------------
+# ─────────── Database ───────────
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -13,551 +16,286 @@ def get_db():
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, email TEXT, password TEXT, role TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS devices (id INTEGER PRIMARY KEY, name TEXT, location TEXT, status TEXT, ip_address TEXT, firmware_version TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS devices (id INTEGER PRIMARY KEY, name TEXT, type TEXT, location TEXT, status TEXT, ip_address TEXT, firmware TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS inquiries (id INTEGER PRIMARY KEY, name TEXT, email TEXT, company TEXT, message TEXT, created_at TEXT)')
     c.execute("DELETE FROM users")
-    c.execute("INSERT INTO users VALUES (1, 'admin@3sec-demo.com', 'Admin123!', 'admin')")
-    c.execute("INSERT INTO users VALUES (2, 'user@3sec-demo.com', 'User123!', 'user')")
+    c.execute("INSERT INTO users VALUES (1,'admin@3sec-demo.com','Admin123!','admin')")
+    c.execute("INSERT INTO users VALUES (2,'user@3sec-demo.com','User123!','user')")
     c.execute("DELETE FROM devices")
     devices = [
-        (1, '温度センサー A', '工場棟1F', 'online', '192.168.1.101', 'v2.1.3'),
-        (2, '湿度センサー B', '工場棟2F', 'online', '192.168.1.102', 'v2.1.3'),
-        (3, '圧力センサー C', '倉庫棟', 'warning', '192.168.1.103', 'v2.0.1'),
-        (4, '振動センサー D', '工場棟1F', 'online', '192.168.1.104', 'v2.1.3'),
-        (5, 'カメラ E', '正門', 'online', '192.168.1.105', 'v1.8.0'),
-        (6, '温度センサー F', '研究棟', 'offline', '192.168.1.106', 'v2.0.1'),
-        (7, '流量計 G', '工場棟1F', 'online', '192.168.1.107', 'v2.1.3'),
-        (8, 'ガス検知器 H', '工場棟2F', 'warning', '192.168.1.108', 'v2.1.3'),
-        (9, 'ドアセンサー I', 'サーバールーム', 'online', '192.168.1.109', 'v1.5.0'),
+        (1, '温度センサー A', 'sensor',    '工場棟1F',       'online',  '192.168.1.101', 'v2.1.3'),
+        (2, '湿度センサー B', 'sensor',    '工場棟2F',       'online',  '192.168.1.102', 'v2.1.3'),
+        (3, '圧力センサー C', 'sensor',    '倉庫棟',         'warning', '192.168.1.103', 'v2.0.1'),
+        (4, '振動センサー D', 'sensor',    '工場棟1F',       'online',  '192.168.1.104', 'v2.1.3'),
+        (5, 'カメラ E',       'camera',    '正門',           'online',  '192.168.1.105', 'v1.8.0'),
+        (6, '温度センサー F', 'sensor',    '研究棟',         'offline', '192.168.1.106', 'v2.0.1'),
     ]
-    c.executemany("INSERT INTO devices VALUES (?,?,?,?,?,?)", devices)
+    c.executemany("INSERT INTO devices VALUES (?,?,?,?,?,?,?)", devices)
     conn.commit()
     conn.close()
 
-if not os.path.exists(DB_PATH):
-    init_db()
-else:
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.execute("SELECT ip_address FROM devices LIMIT 1")
-        conn.close()
-    except Exception:
-        os.remove(DB_PATH)
-        init_db()
+init_db()
 
-# --------------- Navigation ---------------
-NAV_HTML = """
-<nav class="navbar navbar-default">
-  <div class="container">
-    <ul class="nav navbar-nav">
-      <li><a href="/dashboard">ダッシュボード</a></li>
-      <li><a href="/devices">デバイス管理</a></li>
-      <li><a href="/devices?search=%E6%B8%A9%E5%BA%A6">デバイス検索</a></li>
-      <li><a href="/devices/detail?id=1">デバイス詳細</a></li>
-      <li><a href="/firmware">ファームウェア</a></li>
-      <li><a href="/firmware/upload">FWアップロード</a></li>
-      <li><a href="/download?file=firmware_v2.1.3.bin">FWダウンロード</a></li>
-      <li><a href="/tools/ping">Pingツール</a></li>
-      <li><a href="/tools/template-preview">テンプレート</a></li>
-      <li><a href="/contact">お問い合わせ</a></li>
-      <li><a href="/settings">設定</a></li>
-      <li><a href="/admin/dashboard">管理パネル</a></li>
-      <li><a href="/admin/users">ユーザー管理</a></li>
-      <li><a href="/admin/logs">監査ログ</a></li>
-      <li><a href="/admin/settings">システム設定</a></li>
-      <li><a href="/files/">ファイル一覧</a></li>
-    </ul>
-  </div>
-</nav>
-"""
-
-def render_page(title, body_content):
-    return f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>{title} - IoT Portal</title>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
-    <script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-    <link rel="stylesheet" href="/static/css/style.css">
-</head>
-<body>
-{NAV_HTML}
-<div class="container">
-{body_content}
-</div>
-</body>
-</html>""", 200, {{'Content-Type': 'text/html; charset=utf-8'}}
-
-# --------------- After Request Headers ---------------
+# ─────────── Response Headers (意図的に不備) ───────────
 @app.after_request
 def add_headers(response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
+    # VULN: CORS 誤設定 - 全オリジン許可 + credentials
+    response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
     response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = '*'
+    # VULN: 偽装 Server ヘッダー
     response.headers['Server'] = 'Apache/2.4.49 (Unix)'
+    # VULN: セキュリティヘッダー未設定
+    #   - Content-Security-Policy なし
+    #   - Strict-Transport-Security なし
+    #   - X-Frame-Options なし → クリックジャッキング
+    #   - X-Content-Type-Options なし
     return response
 
-# --------------- Auth-free pages ---------------
-
+# ─────────── SPA: 全てのフロントエンドルーティングを index.html に ───────────
 @app.route('/')
 def index():
-    return render_page("IoT Device Management Portal", """
-    <h1>IoT Device Management Portal</h1>
-    <p>Smart Factory向けIoTデバイス統合管理システム</p>
-    <p><a href="/login" class="btn btn-primary">ログイン</a></p>
-    <p><a href="/dashboard">ダッシュボードへ</a></p>
-    """)
+    return send_from_directory('static', 'index.html')
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        email = request.form.get('email', '')
-        password = request.form.get('password', '')
-        sql = "SELECT * FROM users WHERE email='" + email + "' AND password='" + password + "'"
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(sql)
-            user = cursor.fetchone()
-            conn.close()
-            if user:
-                resp = redirect('/dashboard')
-                resp.set_cookie('session_user', email, path='/', max_age=86400)
-                resp.set_cookie('user_role', user['role'], path='/', max_age=86400)
-                return resp
-            else:
-                return render_page("ログイン失敗", f"""
-                <h1>ログインに失敗しました</h1>
-                <p>メールアドレス: {email}</p>
-                <p>実行SQL: {sql}</p>
-                <form method="POST" action="/login">
-                    <input type="text" name="email" class="form-control" value="">
-                    <input type="password" name="password" class="form-control">
-                    <button type="submit" class="btn btn-primary">再試行</button>
-                </form>
-                """)
-        except Exception as e:
-            return render_page("データベースエラー", f"""
-            <h1>データベースエラー</h1>
-            <div class="alert alert-danger">
-                <p><strong>sqlite3.OperationalError</strong>: {str(e)}</p>
-                <p>SQL: {sql}</p>
-            </div>
-            <p>入力値 email: {email}</p>
-            <form method="POST" action="/login">
-                <input type="text" name="email" class="form-control">
-                <input type="password" name="password" class="form-control">
-                <button type="submit" class="btn btn-primary">再試行</button>
-            </form>
-            """)
-    return render_page("ログイン", """
-    <h1>ログイン</h1>
-    <form method="POST" action="/login">
-        <div class="form-group">
-            <label>メールアドレス</label>
-            <input type="text" name="email" class="form-control" placeholder="admin@3sec-demo.com">
-        </div>
-        <div class="form-group">
-            <label>パスワード</label>
-            <input type="password" name="password" class="form-control">
-        </div>
-        <button type="submit" class="btn btn-primary">ログイン</button>
-    </form>
-    """)
+@app.route('/app/<path:path>')
+def spa_catch_all(path):
+    return send_from_directory('static', 'index.html')
 
-@app.route('/sitemap.xml')
-def sitemap():
-    xml = """<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>http://sub.3sec-demo.com/</loc></url>
-  <url><loc>http://sub.3sec-demo.com/login</loc></url>
-  <url><loc>http://sub.3sec-demo.com/dashboard</loc></url>
-  <url><loc>http://sub.3sec-demo.com/devices</loc></url>
-  <url><loc>http://sub.3sec-demo.com/devices?search=%E6%B8%A9%E5%BA%A6</loc></url>
-  <url><loc>http://sub.3sec-demo.com/devices/detail?id=1</loc></url>
-  <url><loc>http://sub.3sec-demo.com/firmware</loc></url>
-  <url><loc>http://sub.3sec-demo.com/firmware/upload</loc></url>
-  <url><loc>http://sub.3sec-demo.com/download?file=firmware_v2.1.3.bin</loc></url>
-  <url><loc>http://sub.3sec-demo.com/tools/ping</loc></url>
-  <url><loc>http://sub.3sec-demo.com/tools/template-preview</loc></url>
-  <url><loc>http://sub.3sec-demo.com/contact</loc></url>
-  <url><loc>http://sub.3sec-demo.com/settings</loc></url>
-  <url><loc>http://sub.3sec-demo.com/admin/dashboard</loc></url>
-  <url><loc>http://sub.3sec-demo.com/admin/users</loc></url>
-  <url><loc>http://sub.3sec-demo.com/admin/logs</loc></url>
-  <url><loc>http://sub.3sec-demo.com/admin/settings</loc></url>
-  <url><loc>http://sub.3sec-demo.com/files/</loc></url>
-</urlset>"""
-    return Response(xml, mimetype='application/xml')
+# ─────────── REST API: ログイン ───────────
+@app.route('/api/login', methods=['POST', 'OPTIONS'])
+def api_login():
+    if request.method == 'OPTIONS':
+        return '', 204
+    data = request.get_json(force=True, silent=True) or {}
+    email = data.get('email', '')
+    password = data.get('password', '')
 
-@app.route('/robots.txt')
-def robots():
-    return Response("User-agent: *\nAllow: /\nSitemap: http://sub.3sec-demo.com/sitemap.xml\n", mimetype='text/plain')
-
-@app.route('/static/css/style.css')
-def style_css():
-    css = "body { padding-top: 10px; } .navbar { margin-bottom: 15px; } .container { max-width: 1200px; }"
-    return Response(css, mimetype='text/css')
-
-@app.route('/favicon.ico')
-def favicon():
-    return Response('', status=200)
-
-@app.route('/admin/users')
-def admin_users():
-    db = get_db()
-    users = db.execute("SELECT * FROM users").fetchall()
-    db.close()
-    rows = "".join(f"<tr><td>{u['id']}</td><td>{u['email']}</td><td>{u['role']}</td><td>{u['password']}</td></tr>" for u in users)
-    return render_page("ユーザー管理", f"""
-    <h1>ユーザー管理</h1>
-    <table class="table table-bordered">
-        <tr><th>ID</th><th>メール</th><th>ロール</th><th>パスワード</th></tr>
-        {rows}
-    </table>
-    """)
-
-@app.route('/api/debug/config')
-def debug_config():
-    import json
-    config = {{"DB_PATH": "/opt/iot-portal/iot_portal.db", "SECRET_KEY": "super-secret-key-never-share", "API_KEY": "sk-demo-3shake-api-key-12345", "DEBUG": True, "INTERNAL_IP": "172.18.0.5"}}
-    return f"""<html><body>{NAV_HTML}<h1>Debug Config</h1><pre>{json.dumps(config, indent=2)}</pre></body></html>""", 200, {{'Content-Type': 'text/html'}}
-
-# --------------- Auth-required pages ---------------
-
-@app.route('/dashboard')
-def dashboard():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    return render_page("ダッシュボード", """
-    <h1>ダッシュボード</h1>
-    <div class="row">
-        <div class="col-md-3"><div class="panel panel-info"><div class="panel-body"><h3>12</h3>登録デバイス</div></div></div>
-        <div class="col-md-3"><div class="panel panel-success"><div class="panel-body"><h3>9</h3>オンライン</div></div></div>
-        <div class="col-md-3"><div class="panel panel-warning"><div class="panel-body"><h3>2</h3>警告</div></div></div>
-        <div class="col-md-3"><div class="panel panel-danger"><div class="panel-body"><h3>1</h3>オフライン</div></div></div>
-    </div>
-    <h3>最近のデバイス</h3>
-    <ul>
-        <li><a href="/devices/detail?id=1">温度センサー A</a></li>
-        <li><a href="/devices/detail?id=2">湿度センサー B</a></li>
-        <li><a href="/devices/detail?id=3">圧力センサー C</a></li>
-    </ul>
-    <h3>クイック検索</h3>
-    <form method="GET" action="/devices">
-        <input type="text" name="search" class="form-control" placeholder="デバイス名で検索">
-        <button type="submit" class="btn btn-default">検索</button>
-    </form>
-    """)
-
-@app.route('/devices')
-def devices():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    search = request.args.get('search', '')
+    # VULN: SQL インジェクション - 文字列連結でクエリ組み立て
+    sql = "SELECT * FROM users WHERE email='" + email + "' AND password='" + password + "'"
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        conn = get_db()
+        user = conn.execute(sql).fetchone()
+        conn.close()
+        if user:
+            resp = jsonify({'success': True, 'user': {'id': user['id'], 'email': user['email'], 'role': user['role']}})
+            # VULN: Cookie - HttpOnly/Secure/SameSite 属性なし
+            resp.set_cookie('session_user', email, path='/')
+            resp.set_cookie('user_role', user['role'], path='/')
+            return resp
+        return jsonify({'success': False, 'error': f'ログイン失敗。SQL: {sql}'}), 401
+    except Exception as e:
+        # VULN: エラーメッセージに SQL 文とスタックトレース漏洩
+        return jsonify({'success': False, 'error': str(e), 'sql': sql}), 500
+
+# ─────────── GraphQL API ───────────
+GRAPHQL_SCHEMA = """
+type Device {
+  id: Int
+  name: String
+  type: String
+  location: String
+  status: String
+  ip_address: String
+  firmware: String
+}
+
+type User {
+  id: Int
+  email: String
+  role: String
+}
+
+type Inquiry {
+  id: Int
+  name: String
+  email: String
+  message: String
+}
+
+type PingResult {
+  host: String
+  output: String
+}
+
+type FetchResult {
+  url: String
+  status: Int
+  body: String
+}
+
+type Query {
+  devices(search: String): [Device]
+  device(id: Int!): Device
+  users: [User]
+  ping(host: String!): PingResult
+  fetch_url(url: String!): FetchResult
+}
+
+type Mutation {
+  submitInquiry(name: String!, email: String!, company: String, message: String!): Inquiry
+}
+"""
+
+def resolve_graphql(query, variables=None):
+    """簡易GraphQLリゾルバー"""
+    variables = variables or {}
+    q = query.strip()
+
+    # IntrospectionQuery - VULN: イントロスペクション有効
+    if '__schema' in q or '__type' in q:
+        return {'data': {'__schema': {
+            'types': [
+                {'name': 'Query', 'fields': [
+                    {'name': 'devices', 'args': [{'name': 'search', 'type': 'String'}]},
+                    {'name': 'device', 'args': [{'name': 'id', 'type': 'Int!'}]},
+                    {'name': 'users', 'args': []},
+                    {'name': 'ping', 'args': [{'name': 'host', 'type': 'String!'}]},
+                    {'name': 'fetch_url', 'args': [{'name': 'url', 'type': 'String!'}]},
+                ]},
+                {'name': 'Mutation', 'fields': [
+                    {'name': 'submitInquiry', 'args': [
+                        {'name': 'name', 'type': 'String!'},
+                        {'name': 'email', 'type': 'String!'},
+                        {'name': 'company', 'type': 'String'},
+                        {'name': 'message', 'type': 'String!'},
+                    ]},
+                ]},
+                {'name': 'Device', 'fields': [
+                    {'name': 'id'}, {'name': 'name'}, {'name': 'type'},
+                    {'name': 'location'}, {'name': 'status'},
+                    {'name': 'ip_address'}, {'name': 'firmware'},
+                ]},
+                {'name': 'PingResult', 'fields': [{'name': 'host'}, {'name': 'output'}]},
+                {'name': 'FetchResult', 'fields': [{'name': 'url'}, {'name': 'status'}, {'name': 'body'}]},
+            ],
+            'queryType': {'name': 'Query'},
+            'mutationType': {'name': 'Mutation'},
+        }}}
+
+    # devices query
+    if 'devices' in q and 'device(' not in q:
+        search = variables.get('search', '')
+        # searchパラメータが query 文字列内にある場合も取得
+        import re
+        m = re.search(r'search\s*:\s*"([^"]*)"', q)
+        if m:
+            search = m.group(1)
+        conn = get_db()
         if search:
+            # VULN: SQL インジェクション（GraphQL 経由）
             sql = "SELECT * FROM devices WHERE name LIKE '%" + search + "%' OR location LIKE '%" + search + "%'"
-            cursor.execute(sql)
+            try:
+                rows = conn.execute(sql).fetchall()
+            except Exception as e:
+                conn.close()
+                return {'errors': [{'message': f'SQL Error: {str(e)}', 'sql': sql}]}
         else:
-            sql = "SELECT * FROM devices"
-            cursor.execute(sql)
-        results = cursor.fetchall()
-        rows_html = ""
-        for r in results:
-            rows_html += f"<tr><td>{r['id']}</td><td>{r['name']}</td><td>{r['location']}</td><td>{r['status']}</td><td>{r['ip_address']}</td><td>{r['firmware_version']}</td></tr>"
+            rows = conn.execute("SELECT * FROM devices").fetchall()
         conn.close()
-        return render_page("デバイス管理", f"""
-        <h1>デバイス管理</h1>
-        <form method="GET" action="/devices">
-            <input type="text" name="search" value="{search}" class="form-control" placeholder="検索...">
-            <button type="submit" class="btn btn-default">検索</button>
-        </form>
-        <p>検索クエリ: {search}</p>
-        <p>実行SQL: {sql}</p>
-        <table class="table table-bordered">
-            <tr><th>ID</th><th>デバイス名</th><th>設置場所</th><th>ステータス</th><th>IP</th><th>FW</th></tr>
-            {rows_html}
-        </table>
-        """)
-    except Exception as e:
-        return render_page("SQLエラー", f"""
-        <h1>データベースエラー</h1>
-        <div class="alert alert-danger">
-            <p><strong>sqlite3.OperationalError</strong>: {str(e)}</p>
-            <p>SQL: {sql}</p>
-        </div>
-        <p>入力値: {search}</p>
-        <a href="/devices">戻る</a>
-        """)
+        return {'data': {'devices': [dict(r) for r in rows]}}
 
-@app.route('/devices/detail')
-def device_detail():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    device_id = request.args.get('id', '1')
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        sql = "SELECT * FROM devices WHERE id=" + device_id
-        cursor.execute(sql)
-        device = cursor.fetchone()
+    # single device
+    if 'device(' in q:
+        import re
+        m = re.search(r'id\s*:\s*(\d+)', q)
+        did = int(m.group(1)) if m else variables.get('id', 1)
+        conn = get_db()
+        row = conn.execute("SELECT * FROM devices WHERE id=?", (did,)).fetchone()
         conn.close()
-        if device:
-            return render_page("デバイス詳細", f"""
-            <h1>デバイス詳細</h1>
-            <p>SQL: {sql}</p>
-            <table class="table">
-                <tr><th>ID</th><td>{device['id']}</td></tr>
-                <tr><th>名前</th><td>{device['name']}</td></tr>
-                <tr><th>場所</th><td>{device['location']}</td></tr>
-                <tr><th>ステータス</th><td>{device['status']}</td></tr>
-                <tr><th>IP</th><td>{device['ip_address']}</td></tr>
-            </table>
-            """)
-        else:
-            return render_page("デバイス詳細", f"<h1>デバイスが見つかりません</h1><p>SQL: {sql}</p>")
-    except Exception as e:
-        return render_page("SQLエラー", f"""
-        <h1>データベースエラー</h1>
-        <p><strong>sqlite3.OperationalError</strong>: {str(e)}</p>
-        <p>SQL: {sql}</p>
-        <p>入力値 id: {device_id}</p>
-        """)
+        return {'data': {'device': dict(row) if row else None}}
 
-@app.route('/tools/ping', methods=['GET', 'POST'])
-def ping_tool():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    result = ""
-    if request.method == 'POST':
-        host = request.form.get('host', '')
-        output = os.popen(f'ping -c 2 {host} 2>&1').read()
-        result = f"<h3>実行結果</h3><pre>{output}</pre>"
-    return render_page("ネットワーク診断ツール", f"""
-    <h1>ネットワーク診断ツール</h1>
-    <form method="POST" action="/tools/ping">
-        <div class="form-group">
-            <label>ホスト名またはIPアドレス</label>
-            <input type="text" name="host" class="form-control" value="192.168.1.1">
-        </div>
-        <button type="submit" class="btn btn-primary">Ping実行</button>
-    </form>
-    {result}
-    """)
+    # ping - VULN: OS コマンドインジェクション
+    if 'ping' in q:
+        import re
+        m = re.search(r'host\s*:\s*"([^"]*)"', q)
+        host = m.group(1) if m else variables.get('host', '127.0.0.1')
+        # VULN: ユーザー入力を直接シェルコマンドに渡す
+        output = subprocess.getoutput(f'ping -c 1 -W 2 {host} 2>&1')
+        return {'data': {'ping': {'host': host, 'output': output}}}
 
-@app.route('/tools/template-preview', methods=['GET', 'POST'])
-def template_preview():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    result = ""
-    if request.method == 'POST':
-        template_code = request.form.get('template', '')
+    # fetch_url - VULN: SSRF（サーバーサイドリクエストフォージェリ）
+    if 'fetch_url' in q:
+        import re
+        m = re.search(r'url\s*:\s*"([^"]*)"', q)
+        url = m.group(1) if m else variables.get('url', '')
         try:
-            from jinja2 import Template
-            rendered = Template(template_code).render(device_name="センサーA", temperature=25.3, status="online")
-            result = f"<h3>プレビュー結果</h3><div class='well'>{rendered}</div>"
+            # VULN: 任意の URL にサーバーからリクエスト（内部ネットワークアクセス可能）
+            req = urllib.request.Request(url, headers={'User-Agent': 'IoT-Portal/1.0'})
+            resp = urllib.request.urlopen(req, timeout=5)
+            body = resp.read(4096).decode('utf-8', errors='replace')
+            return {'data': {'fetch_url': {'url': url, 'status': resp.status, 'body': body}}}
         except Exception as e:
-            result = f"<h3>エラー</h3><pre>{e}</pre>"
-    return render_page("テンプレートプレビュー", f"""
-    <h1>通知テンプレートプレビュー</h1>
-    <form method="POST" action="/tools/template-preview">
-        <div class="form-group">
-            <label>テンプレート</label>
-            <textarea name="template" class="form-control" rows="6">{{{{device_name}}}}のステータスが{{{{status}}}}に変更されました。温度: {{{{temperature}}}}℃</textarea>
-        </div>
-        <button type="submit" class="btn btn-primary">プレビュー</button>
-    </form>
-    {result}
-    """)
+            return {'data': {'fetch_url': {'url': url, 'status': 0, 'body': str(e)}}}
 
-@app.route('/download')
-def download():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    filename = request.args.get('file', '')
-    if not filename:
-        return render_page("ダウンロード", """
-        <h1>ファームウェアダウンロード</h1>
-        <ul>
-            <li><a href="/download?file=firmware_v2.1.3.bin">firmware_v2.1.3.bin</a></li>
-            <li><a href="/download?file=firmware_v2.0.1.bin">firmware_v2.0.1.bin</a></li>
-        </ul>
-        """)
-    filepath = f'/opt/iot-portal/firmware/{filename}'
-    try:
-        with open(filepath, 'rb') as f:
-            content = f.read()
-        return render_page("ダウンロード", f"""
-        <h1>ファイル: {filename}</h1>
-        <pre>{content}</pre>
-        """)
-    except Exception as e:
-        return render_page("エラー", f"""
-        <h1>ダウンロードエラー</h1>
-        <pre>File: {filepath}</pre>
-        <pre>Error: {e}</pre>
-        """)
+    # users
+    if 'users' in q:
+        conn = get_db()
+        rows = conn.execute("SELECT id, email, role FROM users").fetchall()
+        conn.close()
+        return {'data': {'users': [dict(r) for r in rows]}}
 
-@app.route('/contact', methods=['GET', 'POST'])
-def contact():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    submitted = request.args.get('submitted', '')
-    message = request.args.get('message', '')
-    if submitted:
-        return render_page("お問い合わせ完了", f"""
-        <h1>お問い合わせを受け付けました</h1>
-        <div class="alert alert-success"><p>{message}</p></div>
-        <a href="/contact">新しいお問い合わせ</a>
-        """)
-    if request.method == 'POST':
-        msg = request.form.get('message', '')
-        name = request.form.get('name', '')
-        return redirect(f'/contact?submitted=1&message=お問い合わせ「{name}」を受け付けました')
-    return render_page("お問い合わせ", """
-    <h1>お問い合わせ</h1>
-    <form method="POST" action="/contact">
-        <div class="form-group">
-            <label>お名前</label>
-            <input type="text" name="name" class="form-control" placeholder="山田太郎">
-        </div>
-        <div class="form-group">
-            <label>メッセージ</label>
-            <textarea name="message" class="form-control" rows="5"></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary">送信</button>
-    </form>
-    """)
+    # submitInquiry mutation
+    if 'submitInquiry' in q:
+        import re
+        name = re.search(r'name\s*:\s*"([^"]*)"', q)
+        email = re.search(r'email\s*:\s*"([^"]*)"', q)
+        message = re.search(r'message\s*:\s*"([^"]*)"', q)
+        n = name.group(1) if name else variables.get('name', '')
+        e = email.group(1) if email else variables.get('email', '')
+        msg = message.group(1) if message else variables.get('message', '')
+        conn = get_db()
+        conn.execute("INSERT INTO inquiries (name, email, message, created_at) VALUES (?, ?, ?, datetime('now'))", (n, e, msg))
+        conn.commit()
+        conn.close()
+        return {'data': {'submitInquiry': {'name': n, 'email': e, 'message': msg}}}
 
-@app.route('/settings', methods=['GET', 'POST'])
-def settings():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    updated = request.args.get('updated', '')
-    if request.method == 'POST':
-        company = request.form.get('company_name', '')
-        email = request.form.get('notification_email', '')
-        return redirect(f'/settings?updated=1&company={company}&email={email}')
-    if updated:
-        company = request.args.get('company', '')
-        email_param = request.args.get('email', '')
-        return render_page("設定", f"""
-        <h1>設定</h1>
-        <div class="alert alert-success">設定を更新しました: {company} / {email_param}</div>
-        """)
-    return render_page("設定", """
-    <h1>システム設定</h1>
-    <form method="POST" action="/settings">
-        <div class="form-group"><label>会社名</label><input type="text" name="company_name" class="form-control" value="3-shake Inc."></div>
-        <div class="form-group"><label>通知先メール</label><input type="email" name="notification_email" class="form-control" value="admin@3sec-demo.com"></div>
-        <div class="form-group"><label>アラート閾値（℃）</label><input type="number" name="threshold" class="form-control" value="40"></div>
-        <button type="submit" class="btn btn-primary">設定を保存</button>
-    </form>
-    <h3>パスワード変更</h3>
-    <form method="POST" action="/api/change-password">
-        <div class="form-group"><label>新しいパスワード</label><input type="password" name="new_password" class="form-control"></div>
-        <button type="submit" class="btn btn-warning">パスワード変更</button>
-    </form>
-    """)
+    return {'errors': [{'message': 'Unknown query'}]}
 
-@app.route('/firmware')
-def firmware():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    result = request.args.get('result', '')
-    result_html = f'<div class="alert alert-info">結果: {result}</div>' if result else ""
-    return render_page("ファームウェア管理", f"""
-    <h1>ファームウェア管理</h1>
-    {result_html}
-    <h3>アップロード</h3>
-    <form method="POST" action="/firmware/upload" enctype="multipart/form-data">
-        <div class="form-group"><label>ファームウェアファイル</label><input type="file" name="firmware_file" class="form-control"></div>
-        <div class="form-group"><label>バージョン</label><input type="text" name="version" class="form-control" placeholder="v2.1.4"></div>
-        <button type="submit" class="btn btn-primary">アップロード</button>
-    </form>
-    <h3>ダウンロード</h3>
-    <ul>
-        <li><a href="/download?file=firmware_v2.1.3.bin">firmware_v2.1.3.bin (最新)</a></li>
-        <li><a href="/download?file=firmware_v2.0.1.bin">firmware_v2.0.1.bin</a></li>
-    </ul>
-    """)
+@app.route('/graphql', methods=['GET', 'POST', 'OPTIONS'])
+def graphql_endpoint():
+    if request.method == 'OPTIONS':
+        return '', 204
 
-@app.route('/firmware/upload', methods=['GET', 'POST'])
-def firmware_upload():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    if request.method == 'POST':
-        filename = request.form.get('version', 'unknown')
-        return redirect(f'/firmware?result=ファームウェアファイルをアップロードしました:+{filename}')
-    return render_page("FWアップロード", """
-    <h1>ファームウェアアップロード</h1>
-    <form method="POST" action="/firmware/upload" enctype="multipart/form-data">
-        <div class="form-group"><label>ファームウェアファイル</label><input type="file" name="firmware_file" class="form-control"></div>
-        <div class="form-group"><label>バージョン</label><input type="text" name="version" class="form-control" placeholder="v2.1.4"></div>
-        <button type="submit" class="btn btn-primary">アップロード</button>
-    </form>
-    """)
+    # GET: GraphQL Playground / IDE 用
+    if request.method == 'GET':
+        # VULN: GraphQL Playground を本番で公開
+        return '''<!DOCTYPE html>
+<html><head><title>GraphQL Playground</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/graphql-playground-react/build/static/css/index.css"/>
+<script src="https://cdn.jsdelivr.net/npm/graphql-playground-react/build/static/js/middleware.js"></script>
+</head><body><div id="root"></div><script>
+window.addEventListener('load',function(){
+GraphQLPlayground.init(document.getElementById('root'),{endpoint:'/graphql'})
+})</script></body></html>''', 200, {'Content-Type': 'text/html'}
 
-@app.route('/admin/dashboard')
-def admin_dashboard():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    return render_page("管理パネル", """
-    <h1>管理パネル</h1>
-    <div class="row">
-        <div class="col-md-4"><div class="panel panel-default"><div class="panel-heading">ユーザー数</div><div class="panel-body"><h2>24</h2></div></div></div>
-        <div class="col-md-4"><div class="panel panel-default"><div class="panel-heading">アクティブセッション</div><div class="panel-body"><h2>8</h2></div></div></div>
-        <div class="col-md-4"><div class="panel panel-default"><div class="panel-heading">今日のアラート</div><div class="panel-body"><h2>3</h2></div></div></div>
-    </div>
-    """)
+    data = request.get_json(force=True, silent=True) or {}
+    query = data.get('query', '')
+    variables = data.get('variables', {})
+    result = resolve_graphql(query, variables)
+    return jsonify(result)
 
-@app.route('/admin/logs')
-def admin_logs():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    return render_page("監査ログ", """
-    <h1>監査ログ</h1>
-    <table class="table table-bordered">
-        <tr><th>日時</th><th>ユーザー</th><th>アクション</th><th>IP</th></tr>
-        <tr><td>2026-02-28 10:15:00</td><td>admin@3sec-demo.com</td><td>ログイン成功</td><td>172.18.0.1</td></tr>
-        <tr><td>2026-02-28 09:30:00</td><td>user@3sec-demo.com</td><td>デバイス追加</td><td>192.168.1.100</td></tr>
-    </table>
-    """)
+# ─────────── REST: お問い合わせ（オープンリダイレクト） ───────────
+@app.route('/api/inquiry', methods=['POST', 'OPTIONS'])
+def api_inquiry():
+    if request.method == 'OPTIONS':
+        return '', 204
+    data = request.get_json(force=True, silent=True) or {}
+    conn = get_db()
+    conn.execute("INSERT INTO inquiries (name, email, company, message, created_at) VALUES (?, ?, ?, ?, datetime('now'))",
+                 (data.get('name',''), data.get('email',''), data.get('company',''), data.get('message','')))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'message': 'お問い合わせを受け付けました'})
 
-@app.route('/admin/settings', methods=['GET', 'POST'])
-def admin_settings():
-    if not request.cookies.get('session_user'):
-        return redirect('/login')
-    if request.method == 'POST':
-        return render_page("システム設定", '<h1>システム設定</h1><div class="alert alert-success">設定を更新しました</div>')
-    return render_page("システム設定", """
-    <h1>システム設定</h1>
-    <form method="POST" action="/admin/settings">
-        <div class="form-group"><label>セッションタイムアウト（分）</label><input type="number" name="session_timeout" class="form-control" value="30"></div>
-        <div class="form-group"><label>最大ログイン試行回数</label><input type="number" name="max_login_attempts" class="form-control" value="5"></div>
-        <button type="submit" class="btn btn-danger">設定を保存</button>
-    </form>
-    """)
+# VULN: オープンリダイレクト
+@app.route('/redirect')
+def open_redirect():
+    url = request.args.get('url', '/')
+    return redirect(url)
 
-@app.route('/api/change-password', methods=['POST'])
-def change_password():
-    new_password = request.form.get('new_password', '')
-    return render_page("パスワード変更", f"""
-    <h1>パスワードを変更しました</h1>
-    <p>新しいパスワード: {new_password}</p>
-    """)
-
-# --------------- App entry ---------------
+# ─────────── 起動 ───────────
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
