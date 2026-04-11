@@ -27,7 +27,7 @@
 
 <script>
 const { createApp, ref, reactive, computed, onMounted } = Vue
-const { createRouter, createWebHashHistory } = VueRouter
+const { createRouter, createWebHistory } = VueRouter
 
 /* ════════════════════════════════════════
    LOGIN PAGE - ダーク背景 + ガラスモーフィズム
@@ -78,7 +78,7 @@ const LoginPage = {
         const data = await res.json()
         if (data.success) {
           localStorage.setItem('user', JSON.stringify(data.user))
-          router.push('/app/dashboard')
+          router.push('/dashboard')
         } else {
           // VULN: サーバーからのエラーメッセージをHTMLとしてそのまま表示（反射型XSS）
           error.value = data.error
@@ -104,9 +104,9 @@ const DashboardPage = {
         <span class="font-bold">IoT Portal</span>
       </div>
       <nav class="space-y-1 flex-1">
-        <router-link to="/app/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-blue-600/20 text-blue-400 text-sm font-medium">📊 ダッシュボード</router-link>
-        <router-link to="/app/devices" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-gray-800 text-sm">📱 デバイス検索</router-link>
-        <router-link to="/app/contact" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-gray-800 text-sm">✉️ お問い合わせ</router-link>
+        <router-link to="/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-blue-600/20 text-blue-400 text-sm font-medium">📊 ダッシュボード</router-link>
+        <router-link to="/devices" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-gray-800 text-sm">📱 デバイス検索</router-link>
+        <router-link to="/contact" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-gray-800 text-sm">✉️ お問い合わせ</router-link>
       </nav>
       <form @submit.prevent="logout" style="margin:0"><button type="submit" class="text-gray-500 hover:text-gray-300 text-xs bg-transparent border-0 cursor-pointer p-0">← ログアウト</button></form>
     </aside>
@@ -165,8 +165,7 @@ const DashboardPage = {
     function logout() {
       localStorage.removeItem('user')
       document.cookie = 'session_user=;expires=Thu,01 Jan 1970 00:00:00 UTC;path=/'
-      window.location.hash = '#/'
-      location.reload()
+      window.location.href = '/'
     }
     return { devices, stats, logout }
   }
@@ -183,9 +182,9 @@ const DevicesPage = {
         <div class="flex items-center gap-6">
           <span class="font-bold text-emerald-700">📱 IoT Portal</span>
           <nav class="flex gap-4 text-sm">
-            <router-link to="/app/dashboard" class="text-gray-500 hover:text-gray-800">ダッシュボード</router-link>
-            <router-link to="/app/devices" class="text-emerald-600 font-semibold border-b-2 border-emerald-500 pb-0.5">デバイス検索</router-link>
-            <router-link to="/app/contact" class="text-gray-500 hover:text-gray-800">お問い合わせ</router-link>
+            <router-link to="/dashboard" class="text-gray-500 hover:text-gray-800">ダッシュボード</router-link>
+            <router-link to="/devices" class="text-emerald-600 font-semibold border-b-2 border-emerald-500 pb-0.5">デバイス検索</router-link>
+            <router-link to="/contact" class="text-gray-500 hover:text-gray-800">お問い合わせ</router-link>
           </nav>
         </div>
       </div>
@@ -265,10 +264,10 @@ const DeviceDetailPage = {
         <div class="flex items-center gap-6">
           <span class="font-bold text-red-700">🔍 IoT Portal</span>
           <nav class="flex gap-4 text-sm">
-            <router-link to="/app/dashboard" class="text-gray-500 hover:text-gray-800">ダッシュボード</router-link>
-            <router-link to="/app/devices" class="text-gray-500 hover:text-gray-800">デバイス検索</router-link>
+            <router-link to="/dashboard" class="text-gray-500 hover:text-gray-800">ダッシュボード</router-link>
+            <router-link to="/devices" class="text-gray-500 hover:text-gray-800">デバイス検索</router-link>
             <span class="text-red-600 font-semibold border-b-2 border-red-500 pb-0.5">デバイス詳細</span>
-            <router-link to="/app/contact" class="text-gray-500 hover:text-gray-800">お問い合わせ</router-link>
+            <router-link to="/contact" class="text-gray-500 hover:text-gray-800">お問い合わせ</router-link>
           </nav>
         </div>
       </div>
@@ -404,9 +403,9 @@ const ContactPage = {
         <div class="flex items-center gap-6">
           <span class="font-bold text-teal-700">✉️ IoT Portal</span>
           <nav class="flex gap-4 text-sm">
-            <router-link to="/app/dashboard" class="text-gray-500 hover:text-gray-800">ダッシュボード</router-link>
-            <router-link to="/app/devices" class="text-gray-500 hover:text-gray-800">デバイス検索</router-link>
-            <router-link to="/app/contact" class="text-teal-600 font-semibold border-b-2 border-teal-500 pb-0.5">お問い合わせ</router-link>
+            <router-link to="/dashboard" class="text-gray-500 hover:text-gray-800">ダッシュボード</router-link>
+            <router-link to="/devices" class="text-gray-500 hover:text-gray-800">デバイス検索</router-link>
+            <router-link to="/contact" class="text-teal-600 font-semibold border-b-2 border-teal-500 pb-0.5">お問い合わせ</router-link>
           </nav>
         </div>
       </div>
@@ -454,14 +453,14 @@ const ContactPage = {
    ════════════════════════════════════════ */
 const routes = [
   { path: '/', component: LoginPage },
-  { path: '/app/dashboard', component: DashboardPage },
-  { path: '/app/devices', component: DevicesPage },
-  { path: '/app/device', component: DeviceDetailPage },
-  { path: '/app/contact', component: ContactPage },
+  { path: '/dashboard', component: DashboardPage },
+  { path: '/devices', component: DevicesPage },
+  { path: '/device', component: DeviceDetailPage },
+  { path: '/contact', component: ContactPage },
 ]
 
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory('/'),
   routes
 })
 

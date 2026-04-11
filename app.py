@@ -60,8 +60,11 @@ def add_headers(response):
 def index():
     return send_from_directory('static', 'index.html')
 
-@app.route('/app/<path:path>')
-def spa_catch_all(path):
+@app.route('/dashboard')
+@app.route('/devices')
+@app.route('/device')
+@app.route('/contact')
+def spa_pages():
     return send_from_directory('static', 'index.html')
 
 # ─────────── sitemap / robots ───────────
