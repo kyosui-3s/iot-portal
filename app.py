@@ -337,7 +337,7 @@ def devices_search_page():
 <p class="text-muted" style="margin-top:10px">検索キーワード: {q}</p>
 {result_html}
 <hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
-</div></body></html>''', 200, {{'Content-Type': 'text/html; charset=utf-8'}}
+</div></body></html>''', 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 # VULN: OSコマンドインジェクション - GETパラメータ経由
 @app.route('/tools/ping')
@@ -359,7 +359,7 @@ def ping_page():
 </form>
 {result_html}
 <hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
-</div></body></html>''', 200, {{'Content-Type': 'text/html; charset=utf-8'}}
+</div></body></html>''', 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 # VULN: SSRF - GETパラメータで任意URLにアクセス
 @app.route('/tools/fetch')
@@ -387,7 +387,7 @@ def fetch_page():
 </form>
 {result_html}
 <hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
-</div></body></html>''', 200, {{'Content-Type': 'text/html; charset=utf-8'}}
+</div></body></html>''', 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 # VULN: パストラバーサル - ファイルダウンロード
 @app.route('/download')
@@ -403,14 +403,14 @@ def download_file():
 <ul><li><a href="/download?file=firmware_v2.1.3.bin">firmware_v2.1.3.bin</a></li>
 <li><a href="/download?file=firmware_v2.0.1.bin">firmware_v2.0.1.bin</a></li></ul>
 <hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
-</div></body></html>''', 200, {{'Content-Type': 'text/html; charset=utf-8'}}
+</div></body></html>''', 200, {'Content-Type': 'text/html; charset=utf-8'}
     filepath = os.path.join(os.path.dirname(__file__), 'firmware', filename)
     try:
         with open(filepath, 'rb') as f:
             content = f.read()
         return Response(content, mimetype='application/octet-stream', headers={'Content-Disposition': f'attachment; filename={filename}'})
     except Exception as e:
-        return f'<html><body><h1>エラー</h1><pre>File: {filepath}\nError: {e}</pre></body></html>', 404, {{'Content-Type': 'text/html'}}
+        return f'<html><body><h1>エラー</h1><pre>File: {filepath}\nError: {e}</pre></body></html>', 404, {'Content-Type': 'text/html'}
 
 # VULN: オープンリダイレクト
 @app.route('/redirect')
