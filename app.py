@@ -305,6 +305,113 @@ def api_device_detail(device_id):
     except Exception as e:
         return jsonify({'error': f'<strong>Database Error</strong>: {str(e)}<br>SQL: {sql}<br>入力値: {device_id}'}), 500
 
+# ─────────── サーバーレンダリングページ（DASTが検出しやすい形式） ───────────
+
+# VULN: 反射型XSS + SQLi - GETパラメータをHTMLにそのまま埋め込み
+@app.route('/devices/search')
+def devices_search_page():
+    q = request.args.get('q', '')
+    result_html = ''
+    if q:
+        sql = "SELECT * FROM devices WHERE name LIKE '%" + q + "%' OR location LIKE '%" + q + "%'"
+        try:
+            conn = get_db()
+            rows = conn.execute(sql).fetchall()
+            conn.close()
+            result_html = '<h3>検索結果</h3><table class="table table-bordered"><tr><th>ID</th><th>名前</th><th>場所</th><th>ステータス</th><th>IP</th></tr>'
+            for r in rows:
+                result_html += f"<tr><td>{r['id']}</td><td>{r['name']}</td><td>{r['location']}</td><td>{r['status']}</td><td>{r['ip_address']}</td></tr>"
+            result_html += '</table>'
+        except Exception as e:
+            result_html = f'<div class="alert alert-danger"><strong>エラー:</strong> {str(e)}<br>SQL: {sql}</div>'
+    return f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>デバイス検索 - IoT Portal</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head><body>
+<div class="container" style="margin-top:20px">
+<h2>デバイス検索</h2>
+<form method="GET" action="/devices/search">
+<div class="input-group"><input type="text" name="q" value="{q}" class="form-control" placeholder="デバイス名・設置場所で検索">
+<span class="input-group-btn"><button class="btn btn-primary" type="submit">検索</button></span></div>
+</form>
+<p class="text-muted" style="margin-top:10px">検索キーワード: {q}</p>
+{result_html}
+<hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
+</div></body></html>''', 200, {{'Content-Type': 'text/html; charset=utf-8'}}
+
+# VULN: OSコマンドインジェクション - GETパラメータ経由
+@app.route('/tools/ping')
+def ping_page():
+    host = request.args.get('host', '')
+    result_html = ''
+    if host:
+        output = subprocess.getoutput(f'ping -c 2 -W 2 {host} 2>&1')
+        result_html = f'<h3>結果</h3><pre>{output}</pre>'
+    return f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>ネットワーク診断 - IoT Portal</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head><body>
+<div class="container" style="margin-top:20px">
+<h2>ネットワーク診断ツール</h2>
+<form method="GET" action="/tools/ping">
+<div class="input-group"><input type="text" name="host" value="{host}" class="form-control" placeholder="IPアドレスまたはホスト名">
+<span class="input-group-btn"><button class="btn btn-primary" type="submit">Ping実行</button></span></div>
+</form>
+{result_html}
+<hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
+</div></body></html>''', 200, {{'Content-Type': 'text/html; charset=utf-8'}}
+
+# VULN: SSRF - GETパラメータで任意URLにアクセス
+@app.route('/tools/fetch')
+def fetch_page():
+    url = request.args.get('url', '')
+    result_html = ''
+    if url:
+        try:
+            req = urllib.request.Request(url, headers={{'User-Agent': 'IoT-Portal/1.0'}})
+            resp = urllib.request.urlopen(req, timeout=5)
+            body = resp.read(4096).decode('utf-8', errors='replace')
+            import html as html_mod
+            result_html = f'<h3>結果 (Status: {resp.status})</h3><pre>{html_mod.escape(body)}</pre>'
+        except Exception as e:
+            result_html = f'<div class="alert alert-danger">エラー: {str(e)}<br>URL: {url}</div>'
+    return f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>ファームウェア更新チェック - IoT Portal</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head><body>
+<div class="container" style="margin-top:20px">
+<h2>ファームウェア更新チェック</h2>
+<form method="GET" action="/tools/fetch">
+<div class="input-group"><input type="text" name="url" value="{url}" class="form-control" placeholder="https://vendor.example.com/firmware/latest.json">
+<span class="input-group-btn"><button class="btn btn-primary" type="submit">取得</button></span></div>
+</form>
+{result_html}
+<hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
+</div></body></html>''', 200, {{'Content-Type': 'text/html; charset=utf-8'}}
+
+# VULN: パストラバーサル - ファイルダウンロード
+@app.route('/download')
+def download_file():
+    filename = request.args.get('file', '')
+    if not filename:
+        return f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>ダウンロード - IoT Portal</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head><body>
+<div class="container" style="margin-top:20px">
+<h2>ファームウェアダウンロード</h2>
+<ul><li><a href="/download?file=firmware_v2.1.3.bin">firmware_v2.1.3.bin</a></li>
+<li><a href="/download?file=firmware_v2.0.1.bin">firmware_v2.0.1.bin</a></li></ul>
+<hr><a href="/#/app/dashboard">ダッシュボードへ戻る</a>
+</div></body></html>''', 200, {{'Content-Type': 'text/html; charset=utf-8'}}
+    filepath = os.path.join(os.path.dirname(__file__), 'firmware', filename)
+    try:
+        with open(filepath, 'rb') as f:
+            content = f.read()
+        return Response(content, mimetype='application/octet-stream', headers={{'Content-Disposition': f'attachment; filename={filename}'}})
+    except Exception as e:
+        return f'<html><body><h1>エラー</h1><pre>File: {filepath}\nError: {e}</pre></body></html>', 404, {{'Content-Type': 'text/html'}}
+
 # VULN: オープンリダイレクト
 @app.route('/redirect')
 def open_redirect():
