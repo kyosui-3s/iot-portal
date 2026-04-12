@@ -7,11 +7,16 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .stat-card { position:relative; overflow:hidden; }
+    .stat-card::after { content:''; position:absolute; top:-20px; right:-20px; width:80px; height:80px; border-radius:50%; opacity:0.1; }
+    .bar { border-radius:4px 4px 0 0; transition:height 0.5s; }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="min-h-screen">
 <div id="app"></div>
 
-<!-- サイトフッター（クローラー用リンク含む） -->
+<!-- サイトフッター -->
 <footer style="border-top:1px solid #e5e7eb;padding:16px 20px;text-align:center;font-size:12px;color:#9ca3af;margin-top:40px">
   <p>&copy; 2025 3sec Technologies, Inc. |
     <a href="/devices/search" style="color:#6b7280;margin:0 4px">デバイス検索</a> |
@@ -26,49 +31,51 @@
 const { createApp, ref, reactive, onMounted } = Vue
 const { createRouter, createWebHistory } = VueRouter
 
-/* ── 共通ヘッダーコンポーネント ── */
+/* ── 共通ヘッダー：濃い青背景 ── */
 const AppHeader = {
   props: ['current'],
   template: `
-  <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+  <header class="bg-gradient-to-r from-blue-900 to-blue-700 sticky top-0 z-50 shadow-lg">
     <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
       <div class="flex items-center gap-8">
-        <router-link to="/dashboard" class="font-bold text-lg text-blue-800">IoT Portal</router-link>
-        <nav class="flex gap-5 text-sm">
-          <router-link to="/dashboard" :class="current==='dashboard'?'text-blue-600 font-semibold border-b-2 border-blue-500 pb-0.5':'text-gray-500 hover:text-gray-800'">ダッシュボード</router-link>
-          <router-link to="/devices" :class="current==='devices'?'text-blue-600 font-semibold border-b-2 border-blue-500 pb-0.5':'text-gray-500 hover:text-gray-800'">デバイス一覧</router-link>
-          <router-link to="/contact" :class="current==='contact'?'text-blue-600 font-semibold border-b-2 border-blue-500 pb-0.5':'text-gray-500 hover:text-gray-800'">お問い合わせ</router-link>
+        <router-link to="/dashboard" class="font-bold text-lg text-white tracking-wide">🏭 IoT Portal</router-link>
+        <nav class="flex gap-1">
+          <router-link to="/dashboard" class="px-3 py-1.5 rounded text-sm transition" :class="current==='dashboard'?'bg-white/20 text-white font-semibold':'text-blue-200 hover:bg-white/10 hover:text-white'">ダッシュボード</router-link>
+          <router-link to="/devices" class="px-3 py-1.5 rounded text-sm transition" :class="current==='devices'?'bg-white/20 text-white font-semibold':'text-blue-200 hover:bg-white/10 hover:text-white'">デバイス一覧</router-link>
+          <router-link to="/contact" class="px-3 py-1.5 rounded text-sm transition" :class="current==='contact'?'bg-white/20 text-white font-semibold':'text-blue-200 hover:bg-white/10 hover:text-white'">お問い合わせ</router-link>
         </nav>
       </div>
-      <form @submit.prevent="$emit('logout')" style="margin:0"><button type="submit" class="text-gray-400 hover:text-gray-600 text-sm">ログアウト</button></form>
+      <form @submit.prevent="$emit('logout')" style="margin:0"><button type="submit" class="text-blue-300 hover:text-white text-sm">ログアウト</button></form>
     </div>
   </header>`
 }
 
 /* ══════════════════════════════
-   LOGIN
+   LOGIN - 濃い背景 + 中央カード
    ══════════════════════════════ */
 const LoginPage = {
   template: `
-  <div class="min-h-screen flex items-center justify-center" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)">
-    <div class="w-full max-w-sm mx-4">
+  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+    <div class="absolute inset-0 opacity-20" style="background-image:radial-gradient(circle at 20% 50%,#3b82f6 0%,transparent 50%),radial-gradient(circle at 80% 50%,#6366f1 0%,transparent 50%)"></div>
+    <div class="relative w-full max-w-sm mx-4">
       <div class="text-center mb-6">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-blue-500 shadow-lg shadow-blue-500/30 mb-3"><span class="text-2xl">🏭</span></div>
         <h1 class="text-2xl font-bold text-white">IoT Device Portal</h1>
-        <p class="text-blue-200 text-sm mt-1">Smart Factory Management System</p>
+        <p class="text-blue-300 text-sm mt-1">Smart Factory Management System</p>
       </div>
-      <div class="bg-white rounded-xl p-8 shadow-xl">
-        <h2 class="text-lg font-semibold text-gray-800 mb-5">ログイン</h2>
+      <div class="bg-white rounded-2xl p-8 shadow-2xl">
+        <h2 class="text-lg font-bold text-gray-800 mb-5">ログイン</h2>
         <form @submit.prevent="doLogin">
           <div class="mb-4">
-            <label class="block text-sm text-gray-600 mb-1">メールアドレス</label>
-            <input v-model="email" type="text" placeholder="admin@3sec-demo.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <label class="block text-sm font-medium text-gray-600 mb-1.5">メールアドレス</label>
+            <input v-model="email" type="text" placeholder="admin@3sec-demo.com" class="w-full px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition">
           </div>
           <div class="mb-5">
-            <label class="block text-sm text-gray-600 mb-1">パスワード</label>
-            <input v-model="password" type="password" placeholder="••••••••" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <label class="block text-sm font-medium text-gray-600 mb-1.5">パスワード</label>
+            <input v-model="password" type="password" placeholder="••••••••" class="w-full px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition">
           </div>
-          <div v-if="error" class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm" v-html="error"></div>
-          <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-sm transition">ログイン</button>
+          <div v-if="error" class="mb-4 p-3 rounded-lg bg-red-50 border-2 border-red-200 text-red-600 text-sm" v-html="error"></div>
+          <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-sm transition shadow-lg shadow-blue-500/25">ログイン</button>
         </form>
       </div>
     </div>
@@ -87,42 +94,52 @@ const LoginPage = {
 }
 
 /* ══════════════════════════════
-   DASHBOARD - KPIカード + デバイスリスト
+   DASHBOARD - 薄いブルー背景 + カラフルKPIカード + チャート
    ══════════════════════════════ */
 const DashboardPage = {
   components: { AppHeader },
   template: `
-  <div>
+  <div class="bg-slate-100 min-h-screen">
     <AppHeader current="dashboard" @logout="logout" />
-    <main class="max-w-6xl mx-auto px-6 py-8">
-      <h1 class="text-xl font-bold text-gray-900 mb-6">ダッシュボード</h1>
-      <div class="grid grid-cols-4 gap-4 mb-8">
-        <div class="bg-white rounded-lg border border-gray-200 p-5"><p class="text-xs text-gray-500 mb-1">稼働デバイス</p><p class="text-2xl font-bold text-blue-600">{{stats.online}}</p></div>
-        <div class="bg-white rounded-lg border border-gray-200 p-5"><p class="text-xs text-gray-500 mb-1">アラート</p><p class="text-2xl font-bold text-amber-500">{{stats.warning}}</p></div>
-        <div class="bg-white rounded-lg border border-gray-200 p-5"><p class="text-xs text-gray-500 mb-1">オフライン</p><p class="text-2xl font-bold text-red-500">{{stats.offline}}</p></div>
-        <div class="bg-white rounded-lg border border-gray-200 p-5"><p class="text-xs text-gray-500 mb-1">合計</p><p class="text-2xl font-bold text-gray-700">{{stats.total}}</p></div>
+    <!-- ページタイトル帯 -->
+    <div class="bg-gradient-to-r from-blue-800 to-blue-600 px-6 py-6">
+      <div class="max-w-6xl mx-auto flex justify-between items-center">
+        <div><h1 class="text-xl font-bold text-white">ダッシュボード</h1><p class="text-blue-200 text-sm mt-0.5">リアルタイムモニタリング</p></div>
+        <span class="px-4 py-1.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-400/30">● システム正常</span>
       </div>
-      <div class="bg-white rounded-lg border border-gray-200">
-        <div class="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-          <h2 class="font-semibold text-gray-800">デバイス一覧</h2>
-          <router-link to="/devices" class="text-blue-600 text-sm hover:underline">すべて見る →</router-link>
+    </div>
+    <main class="max-w-6xl mx-auto px-6 -mt-4">
+      <!-- KPIカード -->
+      <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="stat-card bg-white rounded-xl p-5 shadow-md border-l-4 border-blue-500"><p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">稼働デバイス</p><p class="text-3xl font-black text-blue-600">{{stats.online}}</p></div>
+        <div class="stat-card bg-white rounded-xl p-5 shadow-md border-l-4 border-amber-500"><p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">アラート</p><p class="text-3xl font-black text-amber-500">{{stats.warning}}</p></div>
+        <div class="stat-card bg-white rounded-xl p-5 shadow-md border-l-4 border-red-500"><p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">オフライン</p><p class="text-3xl font-black text-red-500">{{stats.offline}}</p></div>
+        <div class="stat-card bg-white rounded-xl p-5 shadow-md border-l-4 border-emerald-500"><p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">合計</p><p class="text-3xl font-black text-emerald-600">{{stats.total}}</p></div>
+      </div>
+      <div class="grid grid-cols-5 gap-4">
+        <!-- チャート -->
+        <div class="col-span-3 bg-white rounded-xl p-6 shadow-md">
+          <h3 class="text-sm font-bold text-gray-700 mb-4">デバイス稼働推移（7日間）</h3>
+          <div class="flex items-end gap-3 h-36">
+            <div v-for="(h,i) in [85,92,78,95,88,60,55]" :key="i" class="flex-1 flex flex-col items-center gap-1">
+              <div class="bar w-full" :class="i<5?'bg-blue-500':'bg-blue-300'" :style="{height:h+'%'}"></div>
+              <span class="text-xs font-medium text-gray-400">{{['月','火','水','木','金','土','日'][i]}}</span>
+            </div>
+          </div>
         </div>
-        <table class="w-full text-sm">
-          <thead class="bg-gray-50"><tr>
-            <th class="text-left px-5 py-2.5 text-gray-500 font-medium">名称</th>
-            <th class="text-left px-5 py-2.5 text-gray-500 font-medium">設置場所</th>
-            <th class="text-left px-5 py-2.5 text-gray-500 font-medium">ステータス</th>
-            <th class="text-left px-5 py-2.5 text-gray-500 font-medium"></th>
-          </tr></thead>
-          <tbody class="divide-y divide-gray-50">
-            <tr v-for="d in devices" :key="d.id" class="hover:bg-gray-50">
-              <td class="px-5 py-3 font-medium text-gray-800">{{d.name}}</td>
-              <td class="px-5 py-3 text-gray-500">{{d.location}}</td>
-              <td class="px-5 py-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium" :class="d.status==='online'?'bg-green-100 text-green-700':d.status==='warning'?'bg-amber-100 text-amber-700':'bg-gray-100 text-gray-500'">{{d.status}}</span></td>
-              <td class="px-5 py-3"><router-link :to="'/device?id='+d.id" class="text-blue-500 text-xs hover:underline">詳細</router-link></td>
-            </tr>
-          </tbody>
-        </table>
+        <!-- デバイスリスト -->
+        <div class="col-span-2 bg-white rounded-xl shadow-md overflow-hidden">
+          <div class="px-5 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-sm font-bold text-gray-700">デバイス一覧</h3>
+            <router-link to="/devices" class="text-blue-500 text-xs font-medium hover:underline">すべて →</router-link>
+          </div>
+          <div class="divide-y divide-gray-100">
+            <router-link v-for="d in devices" :key="d.id" :to="'/device?id='+d.id" class="flex items-center justify-between px-5 py-3 hover:bg-blue-50 transition cursor-pointer block">
+              <span class="text-sm font-medium text-gray-700">{{d.name}}</span>
+              <span class="px-2 py-0.5 rounded-full text-xs font-bold" :class="d.status==='online'?'bg-emerald-100 text-emerald-700':d.status==='warning'?'bg-amber-100 text-amber-700':'bg-red-100 text-red-600'">{{d.status}}</span>
+            </router-link>
+          </div>
+        </div>
       </div>
     </main>
   </div>`,
@@ -141,42 +158,46 @@ const DashboardPage = {
 }
 
 /* ══════════════════════════════
-   DEVICES - デバイス一覧（検索付き）
+   DEVICES - 白背景 + 太枠テーブル + カラフルバッジ
    ══════════════════════════════ */
 const DevicesPage = {
   components: { AppHeader },
   template: `
-  <div>
+  <div class="bg-gray-50 min-h-screen">
     <AppHeader current="devices" @logout="logout" />
-    <main class="max-w-6xl mx-auto px-6 py-8">
-      <div class="flex justify-between items-center mb-6">
-        <h1 class="text-xl font-bold text-gray-900">デバイス一覧</h1>
-        <div class="flex gap-3">
-          <input v-model="search" @keyup.enter="doSearch" type="text" placeholder="デバイス名で検索..." class="px-3 py-2 border border-gray-300 rounded-lg text-sm w-56 focus:outline-none focus:ring-2 focus:ring-blue-400">
-          <button @click="doSearch" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">検索</button>
-        </div>
+    <div class="bg-gradient-to-r from-emerald-700 to-teal-600 px-6 py-6">
+      <div class="max-w-6xl mx-auto">
+        <h1 class="text-xl font-bold text-white">デバイス一覧</h1>
+        <p class="text-emerald-200 text-sm mt-0.5">登録済みデバイスの管理と検索</p>
       </div>
-      <div v-if="errorHtml" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm" v-html="errorHtml"></div>
-      <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    </div>
+    <main class="max-w-6xl mx-auto px-6 -mt-4">
+      <div class="bg-white rounded-xl shadow-md overflow-hidden">
+        <!-- 検索バー -->
+        <div class="px-5 py-4 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
+          <input v-model="search" @keyup.enter="doSearch" type="text" placeholder="デバイス名・設置場所で検索..." class="flex-1 px-4 py-2.5 bg-white border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500 transition">
+          <button @click="doSearch" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition shadow">検索</button>
+        </div>
+        <div v-if="errorHtml" class="mx-5 mt-4 p-3 bg-red-50 border-2 border-red-200 rounded-lg text-red-600 text-sm" v-html="errorHtml"></div>
         <table class="w-full text-sm">
-          <thead class="bg-gray-50 border-b border-gray-200"><tr>
-            <th class="text-left px-5 py-3 text-gray-600 font-semibold">ID</th>
-            <th class="text-left px-5 py-3 text-gray-600 font-semibold">名称</th>
-            <th class="text-left px-5 py-3 text-gray-600 font-semibold">種別</th>
-            <th class="text-left px-5 py-3 text-gray-600 font-semibold">設置場所</th>
-            <th class="text-left px-5 py-3 text-gray-600 font-semibold">ステータス</th>
-            <th class="text-left px-5 py-3 text-gray-600 font-semibold">IP</th>
-            <th class="text-left px-5 py-3 text-gray-600 font-semibold"></th>
+          <thead><tr class="bg-gray-800 text-white">
+            <th class="text-left px-5 py-3 font-semibold">ID</th>
+            <th class="text-left px-5 py-3 font-semibold">名称</th>
+            <th class="text-left px-5 py-3 font-semibold">種別</th>
+            <th class="text-left px-5 py-3 font-semibold">設置場所</th>
+            <th class="text-left px-5 py-3 font-semibold">ステータス</th>
+            <th class="text-left px-5 py-3 font-semibold">IP</th>
+            <th class="text-left px-5 py-3 font-semibold">操作</th>
           </tr></thead>
           <tbody class="divide-y divide-gray-100">
-            <tr v-for="d in devices" :key="d.id" class="hover:bg-gray-50">
-              <td class="px-5 py-3 text-gray-400 font-mono text-xs">{{d.id}}</td>
-              <td class="px-5 py-3 font-medium text-gray-800">{{d.name}}</td>
+            <tr v-for="d in devices" :key="d.id" class="hover:bg-emerald-50 transition">
+              <td class="px-5 py-3 text-gray-400 font-mono font-bold">{{d.id}}</td>
+              <td class="px-5 py-3 font-bold text-gray-800">{{d.name}}</td>
               <td class="px-5 py-3 text-gray-500">{{d.type}}</td>
               <td class="px-5 py-3 text-gray-500">{{d.location}}</td>
-              <td class="px-5 py-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium" :class="d.status==='online'?'bg-green-100 text-green-700':d.status==='warning'?'bg-amber-100 text-amber-700':'bg-gray-100 text-gray-500'">{{d.status}}</span></td>
-              <td class="px-5 py-3 text-gray-400 font-mono text-xs">{{d.ip_address}}</td>
-              <td class="px-5 py-3"><router-link :to="'/device?id='+d.id" class="text-blue-500 text-xs hover:underline">詳細</router-link></td>
+              <td class="px-5 py-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold" :class="d.status==='online'?'bg-emerald-500 text-white':d.status==='warning'?'bg-amber-400 text-white':'bg-gray-400 text-white'">{{d.status}}</span></td>
+              <td class="px-5 py-3 font-mono text-xs text-gray-400">{{d.ip_address}}</td>
+              <td class="px-5 py-3"><router-link :to="'/device?id='+d.id" class="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs font-bold hover:bg-blue-200 transition">詳細</router-link></td>
             </tr>
           </tbody>
         </table>
@@ -200,76 +221,74 @@ const DevicesPage = {
 }
 
 /* ══════════════════════════════
-   DEVICE DETAIL - デバイス詳細（B: 手動巡回用）
-   IDを入力して遷移 → ここにCritical脆弱性集中
+   DEVICE DETAIL - B: 手動巡回用
    ══════════════════════════════ */
 const DeviceDetailPage = {
   components: { AppHeader },
   template: `
-  <div>
+  <div class="bg-slate-100 min-h-screen">
     <AppHeader current="" @logout="logout" />
-    <main class="max-w-4xl mx-auto px-6 py-8">
-      <h1 class="text-xl font-bold text-gray-900 mb-6">デバイス詳細</h1>
-
-      <!-- デバイスID入力 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-5 mb-6">
+    <div class="bg-gradient-to-r from-violet-700 to-purple-600 px-6 py-6">
+      <div class="max-w-4xl mx-auto">
+        <h1 class="text-xl font-bold text-white">デバイス詳細</h1>
+        <p class="text-violet-200 text-sm mt-0.5">デバイスの詳細情報と診断ツール</p>
+      </div>
+    </div>
+    <main class="max-w-4xl mx-auto px-6 -mt-4">
+      <!-- ID入力 -->
+      <div class="bg-white rounded-xl shadow-md p-5 mb-6">
         <p class="text-gray-500 text-sm mb-3">デバイスIDを入力して詳細情報を表示</p>
         <div class="flex gap-3">
-          <input v-model="deviceId" @keyup.enter="fetchDevice" type="text" placeholder="デバイスID（例: 1）" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-          <button @click="fetchDevice" class="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">検索</button>
+          <input v-model="deviceId" @keyup.enter="fetchDevice" type="text" placeholder="デバイスID（例: 1）" class="flex-1 px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:border-violet-500 transition">
+          <button @click="fetchDevice" class="px-6 py-2.5 bg-violet-600 text-white rounded-lg text-sm font-bold hover:bg-violet-700 transition shadow">検索</button>
         </div>
       </div>
+      <div v-if="errorHtml" class="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-lg text-red-600 text-sm" v-html="errorHtml"></div>
 
-      <div v-if="errorHtml" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm" v-html="errorHtml"></div>
-
-      <!-- デバイス情報 -->
-      <div v-if="device" class="space-y-6">
-        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div class="px-5 py-4 border-b border-gray-100 bg-blue-50">
-            <h2 class="font-bold text-blue-800">{{device.name}}</h2>
-            <span class="px-2 py-0.5 rounded-full text-xs font-medium" :class="device.status==='online'?'bg-green-100 text-green-700':device.status==='warning'?'bg-amber-100 text-amber-700':'bg-gray-100 text-gray-500'">{{device.status}}</span>
+      <div v-if="device" class="space-y-5">
+        <!-- デバイス情報 -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+          <div class="px-5 py-4 bg-violet-50 border-b-2 border-violet-200">
+            <h2 class="font-bold text-violet-800 text-lg">{{device.name}}</h2>
+            <span class="px-2.5 py-1 rounded-full text-xs font-bold" :class="device.status==='online'?'bg-emerald-500 text-white':device.status==='warning'?'bg-amber-400 text-white':'bg-gray-400 text-white'">{{device.status}}</span>
           </div>
           <table class="w-full text-sm">
-            <tr class="border-b border-gray-50"><th class="text-left px-5 py-3 bg-gray-50 text-gray-600 w-36">ID</th><td class="px-5 py-3">{{device.id}}</td></tr>
-            <tr class="border-b border-gray-50"><th class="text-left px-5 py-3 bg-gray-50 text-gray-600">種別</th><td class="px-5 py-3">{{device.type}}</td></tr>
-            <tr class="border-b border-gray-50"><th class="text-left px-5 py-3 bg-gray-50 text-gray-600">設置場所</th><td class="px-5 py-3">{{device.location}}</td></tr>
-            <tr class="border-b border-gray-50"><th class="text-left px-5 py-3 bg-gray-50 text-gray-600">IPアドレス</th><td class="px-5 py-3 font-mono">{{device.ip_address}}</td></tr>
-            <tr><th class="text-left px-5 py-3 bg-gray-50 text-gray-600">ファームウェア</th><td class="px-5 py-3">{{device.firmware}}</td></tr>
+            <tr class="border-b border-gray-100"><th class="text-left px-5 py-3 bg-gray-50 text-gray-600 w-36 font-bold">ID</th><td class="px-5 py-3 font-mono">{{device.id}}</td></tr>
+            <tr class="border-b border-gray-100"><th class="text-left px-5 py-3 bg-gray-50 text-gray-600 font-bold">種別</th><td class="px-5 py-3">{{device.type}}</td></tr>
+            <tr class="border-b border-gray-100"><th class="text-left px-5 py-3 bg-gray-50 text-gray-600 font-bold">設置場所</th><td class="px-5 py-3">{{device.location}}</td></tr>
+            <tr class="border-b border-gray-100"><th class="text-left px-5 py-3 bg-gray-50 text-gray-600 font-bold">IPアドレス</th><td class="px-5 py-3 font-mono font-bold text-violet-700">{{device.ip_address}}</td></tr>
+            <tr><th class="text-left px-5 py-3 bg-gray-50 text-gray-600 font-bold">ファームウェア</th><td class="px-5 py-3">{{device.firmware}}</td></tr>
           </table>
         </div>
 
         <!-- ネットワーク診断 -->
-        <div class="bg-white rounded-lg border border-gray-200 p-5">
-          <h3 class="font-semibold text-gray-800 mb-3">ネットワーク診断</h3>
+        <div class="bg-white rounded-xl shadow-md p-5">
+          <h3 class="font-bold text-gray-800 mb-3">🌐 ネットワーク診断</h3>
           <div class="flex gap-3 mb-3">
-            <input v-model="pingHost" type="text" :placeholder="device.ip_address" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-            <button @click="doPing" class="px-5 py-2 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800">Ping実行</button>
+            <input v-model="pingHost" type="text" :placeholder="device.ip_address" class="flex-1 px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:border-violet-500 transition">
+            <button @click="doPing" class="px-5 py-2.5 bg-gray-800 text-white rounded-lg text-sm font-bold hover:bg-gray-900 transition">Ping実行</button>
           </div>
-          <pre v-if="pingResult" class="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-auto max-h-40 font-mono">{{pingResult}}</pre>
+          <pre v-if="pingResult" class="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-auto max-h-40 font-mono leading-relaxed">{{pingResult}}</pre>
         </div>
 
         <!-- FW更新チェック -->
-        <div class="bg-white rounded-lg border border-gray-200 p-5">
-          <h3 class="font-semibold text-gray-800 mb-3">ファームウェア更新チェック</h3>
+        <div class="bg-white rounded-xl shadow-md p-5">
+          <h3 class="font-bold text-gray-800 mb-3">📦 ファームウェア更新チェック</h3>
           <div class="flex gap-3 mb-3">
-            <input v-model="fetchUrl" type="text" placeholder="https://vendor.example.com/firmware/latest.json" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-            <button @click="doFetch" class="px-5 py-2 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800">取得</button>
+            <input v-model="fetchUrl" type="text" placeholder="https://vendor.example.com/firmware/latest.json" class="flex-1 px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:border-violet-500 transition">
+            <button @click="doFetch" class="px-5 py-2.5 bg-gray-800 text-white rounded-lg text-sm font-bold hover:bg-gray-900 transition">取得</button>
           </div>
-          <pre v-if="fetchResult" class="bg-gray-50 border border-gray-200 p-4 rounded-lg text-xs overflow-auto max-h-40 font-mono">{{fetchResult}}</pre>
+          <pre v-if="fetchResult" class="bg-gray-50 border-2 border-gray-200 p-4 rounded-lg text-xs overflow-auto max-h-40 font-mono">{{fetchResult}}</pre>
         </div>
       </div>
 
-      <div v-if="!device && !errorHtml" class="text-center py-16 text-gray-400">
-        <p class="text-3xl mb-3">🔍</p>
-        <p>デバイスIDを入力して検索してください</p>
-      </div>
+      <div v-if="!device && !errorHtml" class="text-center py-20 text-gray-300"><p class="text-5xl mb-4">🔍</p><p class="text-lg">デバイスIDを入力して検索してください</p></div>
     </main>
   </div>`,
   setup() {
     const route = VueRouter.useRoute()
     const deviceId = ref(''), device = ref(null), errorHtml = ref('')
     const pingHost = ref(''), pingResult = ref(''), fetchUrl = ref(''), fetchResult = ref('')
-
     async function fetchDevice() {
       if(!deviceId.value) return
       errorHtml.value=''; device.value=null; pingResult.value=''; fetchResult.value=''
@@ -293,26 +312,36 @@ const DeviceDetailPage = {
 }
 
 /* ══════════════════════════════
-   CONTACT - お問い合わせ
+   CONTACT - オレンジ暖色系
    ══════════════════════════════ */
 const ContactPage = {
   components: { AppHeader },
   template: `
-  <div>
+  <div class="bg-orange-50 min-h-screen">
     <AppHeader current="contact" @logout="logout" />
-    <main class="max-w-3xl mx-auto px-6 py-8">
-      <h1 class="text-xl font-bold text-gray-900 mb-6">お問い合わせ</h1>
-      <div class="bg-white rounded-lg border border-gray-200 p-6">
+    <div class="bg-gradient-to-r from-orange-600 to-amber-500 px-6 py-6">
+      <div class="max-w-3xl mx-auto">
+        <h1 class="text-xl font-bold text-white">お問い合わせ</h1>
+        <p class="text-orange-100 text-sm mt-0.5">ご質問やご要望がございましたらお気軽にどうぞ</p>
+      </div>
+    </div>
+    <main class="max-w-3xl mx-auto px-6 -mt-4">
+      <div class="bg-white rounded-xl shadow-md p-8">
         <form @submit.prevent="submitInquiry">
           <div class="grid grid-cols-2 gap-4 mb-4">
-            <div><label class="block text-sm text-gray-600 mb-1">お名前</label><input v-model="name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
-            <div><label class="block text-sm text-gray-600 mb-1">会社名</label><input v-model="company" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
+            <div><label class="block text-sm font-bold text-gray-600 mb-1.5">お名前</label><input v-model="name" type="text" class="w-full px-4 py-2.5 bg-orange-50 border-2 border-orange-200 rounded-lg text-sm focus:outline-none focus:border-orange-400 transition"></div>
+            <div><label class="block text-sm font-bold text-gray-600 mb-1.5">会社名</label><input v-model="company" type="text" class="w-full px-4 py-2.5 bg-orange-50 border-2 border-orange-200 rounded-lg text-sm focus:outline-none focus:border-orange-400 transition"></div>
           </div>
-          <div class="mb-4"><label class="block text-sm text-gray-600 mb-1">メールアドレス</label><input v-model="email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
-          <div class="mb-5"><label class="block text-sm text-gray-600 mb-1">お問い合わせ内容</label><textarea v-model="message" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"></textarea></div>
-          <div v-if="success" class="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">お問い合わせを受け付けました</div>
-          <button type="submit" class="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">送信する</button>
+          <div class="mb-4"><label class="block text-sm font-bold text-gray-600 mb-1.5">メールアドレス</label><input v-model="email" type="email" class="w-full px-4 py-2.5 bg-orange-50 border-2 border-orange-200 rounded-lg text-sm focus:outline-none focus:border-orange-400 transition"></div>
+          <div class="mb-6"><label class="block text-sm font-bold text-gray-600 mb-1.5">お問い合わせ内容</label><textarea v-model="message" rows="5" class="w-full px-4 py-2.5 bg-orange-50 border-2 border-orange-200 rounded-lg text-sm focus:outline-none focus:border-orange-400 resize-none transition"></textarea></div>
+          <div v-if="success" class="mb-4 p-3 rounded-lg bg-emerald-50 border-2 border-emerald-300 text-emerald-700 text-sm font-bold">✓ お問い合わせを受け付けました</div>
+          <button type="submit" class="w-full py-3 bg-orange-500 text-white rounded-lg font-bold text-sm hover:bg-orange-600 transition shadow-lg shadow-orange-500/25">送信する</button>
         </form>
+      </div>
+      <div class="mt-6 grid grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl shadow p-5 text-center border-t-4 border-orange-400"><p class="text-2xl mb-2">📞</p><p class="text-xs text-gray-400 mb-1">電話</p><p class="text-sm font-bold text-gray-700">03-6810-XXXX</p></div>
+        <div class="bg-white rounded-xl shadow p-5 text-center border-t-4 border-amber-400"><p class="text-2xl mb-2">✉️</p><p class="text-xs text-gray-400 mb-1">メール</p><p class="text-sm font-bold text-gray-700">info@3sec-demo.com</p></div>
+        <div class="bg-white rounded-xl shadow p-5 text-center border-t-4 border-yellow-400"><p class="text-2xl mb-2">🕐</p><p class="text-xs text-gray-400 mb-1">営業時間</p><p class="text-sm font-bold text-gray-700">平日 9:00-18:00</p></div>
       </div>
     </main>
   </div>`,
