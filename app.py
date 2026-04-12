@@ -345,7 +345,17 @@ def devices_search_page():
                 result_html += f"<tr><td>{r['id']}</td><td>{r['name']}</td><td>{r['location']}</td><td>{r['status']}</td><td>{r['ip_address']}</td></tr>"
             result_html += '</table>'
         except Exception as e:
-            result_html = f'<div class="alert alert-danger"><strong>エラー:</strong> {str(e)}<br>SQL: {sql}</div>'
+            result_html = f'<div class="alert alert-danger"><strong>sqlite3.OperationalError:</strong> {str(e)}<br><code>SQL: {sql}</code></div>'
+            return f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>SQL Error - IoT Portal</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head><body>
+<div class="container" style="margin-top:20px">
+<h2>データベースエラー</h2>
+{result_html}
+<p>入力値: {q}</p>
+<a href="/devices/search">戻る</a>
+</div></body></html>''', 500, {'Content-Type': 'text/html; charset=utf-8'}
     return f'''<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>デバイス検索 - IoT Portal</title>
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
