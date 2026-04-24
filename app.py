@@ -450,6 +450,145 @@ def open_redirect():
     url = request.args.get('url', '/')
     return redirect(url)
 
+# ─────────── パートナーポータル（手動巡回デモ用） ───────────
+
+PARTNER_PAGE_STYLE = """
+<style>
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: #f8fafc; color: #333; }
+  .partner-header { background: linear-gradient(135deg, #1e3a5f, #2563eb); padding: 16px 24px; }
+  .partner-header h1 { color: #fff; font-size: 18px; margin: 0; }
+  .partner-header p { color: #93c5fd; font-size: 13px; margin: 4px 0 0; }
+  .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+  .card { background: #fff; border: 2px solid #e2e8f0; border-radius: 12px; padding: 32px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .form-group { margin-bottom: 20px; }
+  .form-group label { display: block; font-size: 14px; font-weight: 700; color: #1e3a5f; margin-bottom: 6px; }
+  .form-group input { width: 100%; padding: 12px 16px; border: 2px solid #cbd5e1; border-radius: 8px; font-size: 14px; box-sizing: border-box; }
+  .form-group input:focus { outline: none; border-color: #2563eb; }
+  .form-group .hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .btn { padding: 12px 32px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .alert { padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
+  .alert-danger { background: #fef2f2; border: 2px solid #fecaca; color: #dc2626; }
+  .alert-success { background: #f0fdf4; border: 2px solid #bbf7d0; color: #16a34a; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 10px 16px; background: #1e3a5f; color: #fff; font-size: 13px; }
+  td { padding: 10px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+  tr:nth-child(even) { background: #f1f5f9; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+  .badge-green { background: #dcfce7; color: #16a34a; }
+  .badge-red { background: #fee2e2; color: #dc2626; }
+</style>
+"""
+
+@app.route('/partner/', methods=['GET', 'POST'])
+def partner_login():
+    error = ''
+    if request.method == 'POST':
+        dealer_code = request.form.get('dealer_code', '')
+        contract_number = request.form.get('contract_number', '')
+
+        # バリデーション: 代理店コード DLR-XXXX 形式
+        import re
+        if not re.match(r'^DLR-\d{4}$', dealer_code):
+            error = '代理店コードの形式が正しくありません（DLR-XXXX 形式で入力してください）'
+        # バリデーション: 契約番号 1000〜9999 の範囲
+        elif not contract_number.isdigit() or int(contract_number) < 1000 or int(contract_number) > 9999:
+            error = '契約番号は1000〜9999の範囲で入力してください'
+        else:
+            # 通過 → セッションCookieを発行してダッシュボードへ
+            resp = redirect('/partner/dashboard/')
+            resp.set_cookie('partner_session', f'{dealer_code}:{contract_number}', path='/partner/')
+            return resp
+
+    return f'''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>パートナーポータル - IoT Portal</title>
+{PARTNER_PAGE_STYLE}
+</head><body>
+<div class="partner-header"><h1>🤝 パートナーポータル</h1><p>代理店様向け管理画面</p></div>
+<div class="container">
+  <div class="card">
+    <h2 style="margin:0 0 8px;color:#1e3a5f">パートナーログイン</h2>
+    <p style="color:#64748b;font-size:14px;margin:0 0 24px">代理店契約情報を入力してアクセスしてください</p>
+    {'<div class="alert alert-danger">'+error+'</div>' if error else ''}
+    <form method="POST" action="/partner/">
+      <div class="form-group">
+        <label>代理店コード <span style="color:#dc2626">*</span></label>
+        <input type="text" name="dealer_code" placeholder="DLR-0001" required>
+        <p class="hint">契約時に発行された代理店コード（DLR-XXXX 形式）</p>
+      </div>
+      <div class="form-group">
+        <label>契約番号 <span style="color:#dc2626">*</span></label>
+        <input type="text" name="contract_number" placeholder="1000" required>
+        <p class="hint">1000〜9999の範囲で入力してください</p>
+      </div>
+      <button type="submit" class="btn btn-primary">ログイン</button>
+    </form>
+  </div>
+</div>
+</body></html>''', 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+
+@app.route('/partner/dashboard/')
+def partner_dashboard():
+    # セッションチェック
+    session = request.cookies.get('partner_session', '')
+    if not session or ':' not in session:
+        return redirect('/partner/')
+
+    dealer_code, contract_number = session.split(':', 1)
+
+    # デバイス取得
+    conn = get_db()
+    devices = conn.execute("SELECT * FROM devices").fetchall()
+    conn.close()
+
+    device_rows = ''
+    for d in devices:
+        status_class = 'badge-green' if d['status'] == 'online' else 'badge-red'
+        device_rows += f'<tr><td>{d["id"]}</td><td><strong>{d["name"]}</strong></td><td>{d["location"]}</td><td><span class="badge {status_class}">{d["status"]}</span></td><td style="font-family:monospace">{d["ip_address"]}</td></tr>'
+
+    return f'''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>パートナーダッシュボード - IoT Portal</title>
+{PARTNER_PAGE_STYLE}
+</head><body>
+<div class="partner-header">
+  <h1>🤝 パートナーダッシュボード</h1>
+  <p>代理店コード: {dealer_code} ／ 契約番号: {contract_number}</p>
+</div>
+<div class="container">
+  <div class="card">
+    <h2 style="margin:0 0 16px;color:#1e3a5f">契約情報</h2>
+    <table>
+      <tr><th style="width:200px">代理店コード</th><td>{dealer_code}</td></tr>
+      <tr><th>契約番号</th><td>{contract_number}</td></tr>
+      <tr><th>契約プラン</th><td>エンタープライズ（100台）</td></tr>
+      <tr><th>契約期間</th><td>2025/04/01 〜 2026/03/31</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 16px;color:#1e3a5f">管理デバイス一覧</h2>
+    <table>
+      <tr><th>ID</th><th>名称</th><th>設置場所</th><th>ステータス</th><th>IP</th></tr>
+      {device_rows}
+    </table>
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 16px;color:#1e3a5f">デバイス検索</h2>
+    <form method="GET" action="/partner/dashboard/">
+      <div class="form-group">
+        <label>デバイス名・設置場所で検索</label>
+        <input type="text" name="q" placeholder="例: 温度センサー" value="{request.args.get('q', '')}">
+      </div>
+      <button type="submit" class="btn btn-primary">検索</button>
+    </form>
+  </div>
+</div>
+</body></html>''', 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+
 # ─────────── 起動 ───────────
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
