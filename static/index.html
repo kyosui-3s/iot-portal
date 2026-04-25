@@ -49,6 +49,7 @@ const AppHeader = {
           <router-link to="/devices" class="px-3 py-1.5 rounded text-sm transition" :class="current==='devices'?'bg-white/20 text-white font-semibold':'text-blue-200 hover:bg-white/10 hover:text-white'">デバイス一覧</router-link>
           <router-link to="/device" class="px-3 py-1.5 rounded text-sm transition" :class="current==='device'?'bg-white/20 text-white font-semibold':'text-blue-200 hover:bg-white/10 hover:text-white'">デバイス詳細</router-link>
           <router-link to="/contact" class="px-3 py-1.5 rounded text-sm transition" :class="current==='contact'?'bg-white/20 text-white font-semibold':'text-blue-200 hover:bg-white/10 hover:text-white'">お問い合わせ</router-link>
+          <a href="/partner/" class="px-3 py-1.5 rounded text-sm text-blue-200 hover:bg-white/10 hover:text-white transition">パートナー</a>
         </nav>
       </div>
       <form @submit.prevent="$emit('logout')" style="margin:0"><button type="submit" class="text-blue-300 hover:text-white text-sm">ログアウト</button></form>
