@@ -589,6 +589,343 @@ def partner_dashboard():
 </body></html>''', 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 
+# ═══════════════════════════════════════════
+# XPath エッジケース検証用ページ
+#   /xpath-edge-cases/  → インデックス
+#   /xpath-edge-cases/case1/         属性レス・テキストレス要素
+#   /xpath-edge-cases/case1-iframe/  Case1のiframe版
+#   /xpath-edge-cases/case2/         重複要素（同名ボタン10個）
+#   /xpath-edge-cases/case3/         動的ID（リロード毎に変化）
+#   /xpath-edge-cases/case4/         テーブル特定セル
+# ═══════════════════════════════════════════
+
+XPATH_STYLE = """
+<style>
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: #f8fafc; color: #333; line-height: 1.6; }
+  .xp-header { background: #1E3A5F; padding: 18px 24px; }
+  .xp-header h1 { color: #fff; font-size: 18px; margin: 0; }
+  .xp-header p { color: #c7d2fe; font-size: 13px; margin: 4px 0 0; }
+  .xp-container { max-width: 960px; margin: 0 auto; padding: 24px; }
+  .xp-card { background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+  .xp-card h2 { margin: 0 0 12px; color: #1E3A5F; font-size: 17px; border-left: 4px solid #F5A623; padding-left: 10px; }
+  .xp-note { background: #fff8ec; border: 1px solid #F5A623; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; font-size: 13px; color: #4b5563; }
+  .xp-note strong { color: #1E3A5F; }
+  .xp-btn { display: inline-block; padding: 10px 22px; background: #1E3A5F; color: #fff; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; text-decoration: none; }
+  .xp-btn:hover { background: #2d4a72; }
+  .xp-btn-accent { background: #F5A623; }
+  .xp-btn-accent:hover { background: #d68a0e; }
+  .xp-input { padding: 9px 14px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; box-sizing: border-box; width: 100%; max-width: 360px; }
+  .xp-link-list { list-style: none; padding: 0; }
+  .xp-link-list li { padding: 12px 16px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px; background: #fff; }
+  .xp-link-list a { color: #1E3A5F; text-decoration: none; font-weight: 600; }
+  .xp-link-list a:hover { color: #F5A623; }
+  .xp-link-list .desc { font-size: 12px; color: #64748b; margin-top: 4px; }
+  table.xp-table { width: 100%; border-collapse: collapse; }
+  table.xp-table th { background: #1E3A5F; color: #fff; padding: 10px 14px; text-align: left; font-size: 13px; }
+  table.xp-table td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+  table.xp-table tr:nth-child(even) td { background: #f8fafc; }
+  .xp-back { font-size: 13px; color: #64748b; margin-bottom: 16px; display: inline-block; }
+  .xp-back a { color: #1E3A5F; }
+</style>
+"""
+
+def xp_page(title, body):
+    return f"""<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>{title} - XPath エッジケース</title>
+{XPATH_STYLE}
+</head><body>
+<div class="xp-header"><h1>🧭 XPath エッジケース検証</h1><p>DAST 巡回マップの完全XPath指定検証用サンプル</p></div>
+<div class="xp-container">{body}</div>
+</body></html>""", 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+
+@app.route('/xpath-edge-cases/')
+def xpath_index():
+    body = '''
+<a class="xp-back" href="/">← サイトトップへ戻る</a>
+<div class="xp-card">
+  <h2>このページについて</h2>
+  <p style="margin:0;font-size:14px;color:#475569">
+    Securify DAST の巡回マップ機能で「完全XPath指定」が必要になるエッジケースを集めたサンプル集です。<br>
+    お客様自身が拡張機能（巡回マップ）上で要素を指定して解決できるかの検証用に使用してください。
+  </p>
+</div>
+<div class="xp-card">
+  <h2>ケース一覧</h2>
+  <ul class="xp-link-list">
+    <li>
+      <a href="/xpath-edge-cases/case1/">Case 1: 属性レス・テキストレスの要素群</a>
+      <div class="desc">30個ネストした無属性 div/span のうち1つだけがクリックでPOSTを送信。完全XPathでないと特定不可。</div>
+    </li>
+    <li>
+      <a href="/xpath-edge-cases/case1-iframe/">Case 1（iframe 版）</a>
+      <div class="desc">Case 1 を iframe 内に埋め込んだバージョン。iframe コンテキストでのXPath指定検証用。</div>
+    </li>
+    <li>
+      <a href="/xpath-edge-cases/case2/">Case 2: 重複要素（同名ボタン大量配置）</a>
+      <div class="desc">「詳細」ボタンが10個、全て同じclass。5番目だけが機微エンドポイントを叩く。</div>
+    </li>
+    <li>
+      <a href="/xpath-edge-cases/case3/">Case 3: 動的ID（リロード毎に変化）</a>
+      <div class="desc">リロード毎に id が変わる + 2.5秒の遅延読み込み。ID/CSSセレクタ固定不可。</div>
+    </li>
+    <li>
+      <a href="/xpath-edge-cases/case4/">Case 4: テーブル特定セル</a>
+      <div class="desc">10×5 の商品テーブル。3行目4列目のセルだけが削除API（パストラバーサル）を叩く。</div>
+    </li>
+  </ul>
+</div>
+'''
+    return xp_page('インデックス', body)
+
+
+# ─── Case 1: 属性レス要素（30個ネスト、1つだけPOSTトリガー） ───
+@app.route('/xpath-edge-cases/case1/', methods=['GET', 'POST'])
+def xpath_case1():
+    if request.method == 'POST':
+        # VULN: 反射型XSS（payloadをHTMLにそのまま埋め込み）
+        payload = request.form.get('payload', '')
+        body = f'''
+<a class="xp-back" href="/xpath-edge-cases/">← ケース一覧へ</a>
+<div class="xp-card">
+  <h2>POST 受信完了</h2>
+  <p>受け取った payload: {payload}</p>
+  <p style="font-size:13px;color:#64748b">完全XPathで指定したトリガー要素から正常に POST が送信されました。</p>
+</div>
+'''
+        return xp_page('Case 1 結果', body)
+
+    # 30個のネストされた属性なし要素を生成
+    nested = ''
+    for i in range(30):
+        nested += f'<div><span>&nbsp;</span>'
+    nested += '</div>' * 30
+
+    body = '''
+<a class="xp-back" href="/xpath-edge-cases/">← ケース一覧へ</a>
+<div class="xp-note">
+  <strong>想定される検出フロー:</strong> 30個の無属性 div/span のうち、特定の1要素をクリックすると hidden form 経由で POST が送信されます。<br>
+  <strong>完全XPathが必要な理由:</strong> ID・class・name・テキストいずれも識別子がないため、<code>/html/body/.../div[2]/div[3]/div[1]/span[5]</code> のような位置指定でしか到達できません。
+</div>
+<div class="xp-card">
+  <h2>属性レス要素群</h2>
+  <p style="font-size:13px;color:#64748b">下記30個のネストされた要素のうち、1つだけがクリック時に POST を送信します。</p>
+  <div id="nested-area" style="border:1px dashed #cbd5e1;padding:14px;border-radius:6px;font-family:monospace;font-size:11px;color:#94a3b8">
+    [nested empty elements ×30]
+    <div style="display:none">''' + nested + '''</div>
+  </div>
+  <form id="hidden-form" method="POST" action="/xpath-edge-cases/case1/" style="display:none">
+    <input type="hidden" name="payload" value="trigger-from-deep-element">
+  </form>
+  <div style="margin-top:16px">
+    <!-- 30個のうち、5番目のspan要素だけがクリックで POST トリガー -->
+    <div><div><div><div><span style="display:inline-block;padding:4px 12px;background:#fff8ec;border:1px solid #F5A623;border-radius:4px;cursor:pointer;font-size:12px;color:#1E3A5F" onclick="document.getElementById('hidden-form').submit()">[ trigger element / 完全XPathで指定 ]</span></div></div></div></div>
+  </div>
+</div>
+'''
+    return xp_page('Case 1', body)
+
+
+# ─── Case 1 iframe 版 ───
+@app.route('/xpath-edge-cases/case1-iframe/')
+def xpath_case1_iframe():
+    body = '''
+<a class="xp-back" href="/xpath-edge-cases/">← ケース一覧へ</a>
+<div class="xp-note">
+  <strong>想定される検出フロー:</strong> Case 1 と同じ構造を iframe 内に配置。iframe コンテキスト切替を含む完全XPath指定の検証用。<br>
+  <strong>完全XPathが必要な理由:</strong> iframe 内要素はメインドキュメントの DOM ツリーから切り離されているため、iframe を経由した XPath 指定が必要です。
+</div>
+<div class="xp-card">
+  <h2>iframe 内の Case 1</h2>
+  <iframe src="/xpath-edge-cases/case1/" style="width:100%;height:520px;border:1px solid #cbd5e1;border-radius:6px"></iframe>
+</div>
+'''
+    return xp_page('Case 1 iframe', body)
+
+
+# ─── Case 2: 同名ボタン10個 ───
+@app.route('/xpath-edge-cases/case2/')
+def xpath_case2():
+    buttons = ''
+    for i in range(1, 11):
+        buttons += f'<a href="/xpath-edge-cases/case2/detail/{i}/" class="xp-btn" style="margin:4px">詳細</a>'
+
+    body = f'''
+<a class="xp-back" href="/xpath-edge-cases/">← ケース一覧へ</a>
+<div class="xp-note">
+  <strong>想定される検出フロー:</strong> 10個の「詳細」ボタンのうち、5番目だけが機微エンドポイント（SQLi 検出対象）に遷移します。<br>
+  <strong>完全XPathが必要な理由:</strong> 全ボタンが同じ class="xp-btn"・同じテキスト「詳細」のため、テキスト/属性ベースのセレクタでは識別不能。<code>//a[5]</code> のような位置指定が必須です。
+</div>
+<div class="xp-card">
+  <h2>商品一覧</h2>
+  <p style="font-size:13px;color:#64748b">下記の「詳細」ボタンを押すとそれぞれ別の商品ページへ遷移します。</p>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+    {buttons}
+  </div>
+</div>
+'''
+    return xp_page('Case 2', body)
+
+
+@app.route('/xpath-edge-cases/case2/detail/<int:item_id>/')
+def xpath_case2_detail(item_id):
+    # VULN: 5番目だけ SQLi（id パラメータを直接 SQL に組み込む）
+    if item_id == 5:
+        q = request.args.get('id', '5')
+        sql = "SELECT * FROM devices WHERE id=" + q
+        try:
+            conn = get_db()
+            row = conn.execute(sql).fetchone()
+            conn.close()
+            result = f'<p>SQL: <code>{sql}</code></p><p>結果: {dict(row) if row else "見つかりません"}</p>'
+        except Exception as e:
+            result = f'<div style="color:#1E3A5F;background:#fff8ec;border:1px solid #F5A623;padding:12px;border-radius:6px"><strong>sqlite3.OperationalError:</strong> {str(e)}<br>SQL: {sql}</div>'
+            body = f'''
+<a class="xp-back" href="/xpath-edge-cases/case2/">← Case 2 へ</a>
+<div class="xp-card"><h2>商品 #{item_id} 詳細（機微エンドポイント）</h2>{result}</div>
+'''
+            return xp_page(f'Case 2 - 商品{item_id}', body), 500, {'Content-Type': 'text/html; charset=utf-8'}
+    else:
+        result = f'<p>商品ID: {item_id}</p><p>これは通常の商品詳細ページです。</p>'
+
+    body = f'''
+<a class="xp-back" href="/xpath-edge-cases/case2/">← Case 2 へ</a>
+<div class="xp-card">
+  <h2>商品 #{item_id} 詳細{' （機微エンドポイント）' if item_id == 5 else ''}</h2>
+  {result}
+</div>
+'''
+    return xp_page(f'Case 2 - 商品{item_id}', body)
+
+
+# ─── Case 3: 動的ID + 遅延読み込み ───
+@app.route('/xpath-edge-cases/case3/')
+def xpath_case3():
+    import random
+    # サーバ側でも初期動的IDを生成（クライアントJSでもリロード時に再生成）
+    ids = [f'id_{random.randint(10000, 99999)}' for _ in range(3)]
+
+    body = f'''
+<a class="xp-back" href="/xpath-edge-cases/">← ケース一覧へ</a>
+<div class="xp-note">
+  <strong>想定される検出フロー:</strong> 3つのフォーム送信ボタンが、リロード毎に異なる ID で生成されます。さらに DOM 構築は 2.5 秒遅延します。<br>
+  <strong>完全XPathが必要な理由:</strong> ID が固定でないため <code>#id_12345</code> のようなセレクタは使い物になりません。位置指定の XPath（<code>//form[1]/button</code>）が必要です。
+</div>
+<div class="xp-card">
+  <h2>動的ID + 遅延読み込みフォーム</h2>
+  <p style="font-size:13px;color:#64748b">DOM は 2.5 秒後に構築されます（読み込み待ちの再現）。</p>
+  <div id="loading" style="padding:24px;text-align:center;color:#94a3b8;font-size:14px">読み込み中... ⏳</div>
+  <div id="forms-container" style="display:none">
+    <form method="GET" action="/xpath-edge-cases/case3/redirect" style="margin-bottom:16px;padding:16px;border:1px solid #e2e8f0;border-radius:6px">
+      <p style="margin:0 0 8px;font-weight:600">フォームA</p>
+      <input type="text" id="{ids[0]}" name="next" placeholder="リダイレクト先URL" class="xp-input" style="margin-right:8px">
+      <button type="submit" class="xp-btn">送信</button>
+    </form>
+    <form method="GET" action="/xpath-edge-cases/case3/redirect" style="margin-bottom:16px;padding:16px;border:1px solid #e2e8f0;border-radius:6px">
+      <p style="margin:0 0 8px;font-weight:600">フォームB</p>
+      <input type="text" id="{ids[1]}" name="next" placeholder="リダイレクト先URL" class="xp-input" style="margin-right:8px">
+      <button type="submit" class="xp-btn-accent xp-btn">送信</button>
+    </form>
+    <form method="GET" action="/xpath-edge-cases/case3/redirect" style="padding:16px;border:1px solid #e2e8f0;border-radius:6px">
+      <p style="margin:0 0 8px;font-weight:600">フォームC</p>
+      <input type="text" id="{ids[2]}" name="next" placeholder="リダイレクト先URL" class="xp-input" style="margin-right:8px">
+      <button type="submit" class="xp-btn">送信</button>
+    </form>
+  </div>
+</div>
+<script>
+// 2.5秒遅延で DOM を表示（実際のSPAの遅延読み込み再現）
+setTimeout(function() {{
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('forms-container').style.display = 'block';
+  // クライアント側でも ID を再生成（より動的に）
+  var inputs = document.querySelectorAll('#forms-container input');
+  inputs.forEach(function(el) {{
+    el.id = 'id_' + Math.floor(Math.random() * 90000 + 10000);
+  }});
+}}, 2500);
+</script>
+'''
+    return xp_page('Case 3', body)
+
+
+@app.route('/xpath-edge-cases/case3/redirect')
+def xpath_case3_redirect():
+    # VULN: オープンリダイレクト
+    next_url = request.args.get('next', '/xpath-edge-cases/case3/')
+    return redirect(next_url)
+
+
+# ─── Case 4: 10×5テーブル、3行4列セルだけクリック可（削除API） ───
+@app.route('/xpath-edge-cases/case4/')
+def xpath_case4():
+    products = [
+        ('商品A-001', 'センサー', '¥12,800', '在庫あり'),
+        ('商品B-002', 'カメラ', '¥45,000', '在庫あり'),
+        ('商品C-003', 'ゲートウェイ', '¥98,500', '在庫あり'),
+        ('商品D-004', 'センサー', '¥8,900', '残りわずか'),
+        ('商品E-005', 'ハブ', '¥34,200', '在庫あり'),
+        ('商品F-006', 'センサー', '¥15,600', '在庫あり'),
+        ('商品G-007', 'カメラ', '¥52,000', '在庫あり'),
+        ('商品H-008', 'コントローラー', '¥78,300', '残りわずか'),
+        ('商品I-009', 'センサー', '¥11,200', '在庫あり'),
+        ('商品J-010', 'ゲートウェイ', '¥105,000', '在庫あり'),
+    ]
+    rows = ''
+    for i, (name, cat, price, stock) in enumerate(products, 1):
+        # 3行目4列目（在庫セル）だけクリック可能 → 削除API
+        if i == 3:
+            stock_cell = f'<td style="cursor:pointer;color:#1E3A5F;text-decoration:underline" onclick="location.href=\'/xpath-edge-cases/case4/delete/?file=../../../etc/passwd\'">{stock}</td>'
+        else:
+            stock_cell = f'<td>{stock}</td>'
+        rows += f'<tr><td>{i}</td><td>{name}</td><td>{cat}</td><td>{price}</td>{stock_cell}</tr>'
+
+    body = f'''
+<a class="xp-back" href="/xpath-edge-cases/">← ケース一覧へ</a>
+<div class="xp-note">
+  <strong>想定される検出フロー:</strong> 10×5 の商品テーブルで、3行目4列目のセルだけがクリック可能で削除API（パストラバーサル脆弱性あり）を叩きます。<br>
+  <strong>完全XPathが必要な理由:</strong> 全セルに識別属性なし、テキストも類似（商品名・価格などが似た形式）のため、<code>//table/tbody/tr[3]/td[4]</code> のような位置指定でしか狙い撃ちできません。
+</div>
+<div class="xp-card">
+  <h2>商品在庫一覧</h2>
+  <table class="xp-table">
+    <thead><tr><th>No</th><th>商品名</th><th>カテゴリ</th><th>価格</th><th>在庫</th></tr></thead>
+    <tbody>{rows}</tbody>
+  </table>
+</div>
+'''
+    return xp_page('Case 4', body)
+
+
+@app.route('/xpath-edge-cases/case4/delete/')
+def xpath_case4_delete():
+    # VULN: パストラバーサル（任意ファイル読み取り）
+    filename = request.args.get('file', '')
+    if not filename:
+        body = '''
+<a class="xp-back" href="/xpath-edge-cases/case4/">← Case 4 へ</a>
+<div class="xp-card"><h2>削除エンドポイント</h2><p>file パラメータが指定されていません。</p></div>
+'''
+        return xp_page('Case 4 - 削除', body)
+
+    filepath = os.path.join('/opt/iot-portal/firmware', filename)
+    try:
+        with open(filepath, 'r', errors='replace') as f:
+            content = f.read(2048)
+        result = f'<pre style="background:#1E3A5F;color:#F5A623;padding:14px;border-radius:6px;overflow:auto;font-size:12px">{content}</pre>'
+    except Exception as e:
+        result = f'<div style="color:#1E3A5F;background:#fff8ec;border:1px solid #F5A623;padding:12px;border-radius:6px"><strong>FileError:</strong> {str(e)}<br>Path: {filepath}</div>'
+
+    body = f'''
+<a class="xp-back" href="/xpath-edge-cases/case4/">← Case 4 へ</a>
+<div class="xp-card">
+  <h2>削除対象ファイル: {filename}</h2>
+  {result}
+</div>
+'''
+    return xp_page('Case 4 - 削除実行', body)
+
+
 # ─────────── 起動 ───────────
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
