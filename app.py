@@ -164,6 +164,131 @@ th{background:#1e3a5f;color:#fff}</style></head>
         return Response(err_html, mimetype='text/html', status=500)
 
 
+# ─────────── レガシーHTML: デバイスIDで検索（数値カラム error-based SQLi） ───────────
+# VULN: GET /devices/lookup?id=1' で SQL syntax error 確実発火
+@app.route('/devices/lookup')
+def devices_lookup_legacy():
+    did = request.args.get('id', '')
+    if not did:
+        return Response('''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>デバイスID検索</title></head>
+<body style="font-family:Arial;max-width:700px;margin:40px auto">
+<h1>デバイスID検索</h1>
+<form method="GET" action="/devices/lookup">
+  <label>ID: <input type="text" name="id" value="1"></label>
+  <button type="submit">検索</button>
+</form>
+<p><a href="/devices/lookup?id=1">サンプル: ID=1</a></p>
+</body></html>''', mimetype='text/html')
+
+    # VULN: SQL injection - 数値カラムに直接連結
+    sql = "SELECT id, name, type, location, status, ip_address, firmware FROM devices WHERE id=" + did
+    try:
+        conn = get_db()
+        rows = conn.execute(sql).fetchall()
+        conn.close()
+        result_rows = ''.join(
+            f'<tr><td>{r["id"]}</td><td>{r["name"]}</td><td>{r["type"]}</td><td>{r["location"]}</td><td>{r["status"]}</td><td>{r["ip_address"]}</td><td>{r["firmware"]}</td></tr>'
+            for r in rows
+        )
+        # VULN: Reflected XSS via id
+        return Response(f'''<!DOCTYPE html>
+<html><body>
+<h1>デバイスID={did}</h1>
+<p>実行SQL: <code>{sql}</code></p>
+<p>該当: {len(rows)} 件</p>
+<table border="1" cellpadding="5">
+<tr><th>ID</th><th>名称</th><th>種別</th><th>設置場所</th><th>状態</th><th>IP</th><th>FW</th></tr>
+{result_rows}
+</table>
+<a href="/devices/lookup">戻る</a>
+</body></html>''', mimetype='text/html')
+    except Exception as e:
+        # VULN: SQL error露出 + 500 → 確実に DAST 検出
+        return Response(f'''<!DOCTYPE html>
+<html><body>
+<h1>Database Error</h1>
+<p><strong>Error:</strong> {str(e)}</p>
+<p><strong>SQL:</strong> <code>{sql}</code></p>
+<p><strong>Input id:</strong> {did}</p>
+</body></html>''', mimetype='text/html', status=500)
+
+
+# ─────────── レガシーHTML: ネットワーク診断（OSコマンドインジェクション） ───────────
+# VULN: GET /tools/ping?host=127.0.0.1;id で RCE
+@app.route('/tools/ping')
+def tools_ping_legacy():
+    host = request.args.get('host', '')
+    if not host:
+        return Response('''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>ネットワーク診断 (ping)</title></head>
+<body style="font-family:Arial;max-width:700px;margin:40px auto">
+<h1>ネットワーク診断ツール（旧版）</h1>
+<form method="GET" action="/tools/ping">
+  <label>ホスト: <input type="text" name="host" value="127.0.0.1" size="40"></label>
+  <button type="submit">Ping実行</button>
+</form>
+<p><a href="/tools/ping?host=127.0.0.1">サンプル: 127.0.0.1</a></p>
+</body></html>''', mimetype='text/html')
+
+    # VULN: OS Command Injection - shell=True で host を直接実行
+    cmd = "ping -c 1 -W 2 " + host
+    try:
+        output = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, timeout=8).decode('utf-8', errors='replace')
+        status = 200
+    except subprocess.CalledProcessError as e:
+        output = e.output.decode('utf-8', errors='replace') if e.output else str(e)
+        status = 200
+    except Exception as e:
+        output = str(e)
+        status = 500
+    # VULN: cmd 文字列とコマンド出力をそのまま返す
+    return Response(f'''<!DOCTYPE html>
+<html><body>
+<h1>Ping結果</h1>
+<p>実行コマンド: <code>{cmd}</code></p>
+<pre style="background:#000;color:#0f0;padding:10px">{output}</pre>
+<a href="/tools/ping">戻る</a>
+</body></html>''', mimetype='text/html', status=status)
+
+
+# ─────────── レガシーHTML: FW更新チェック (SSRF) ───────────
+# VULN: GET /tools/fetch?url=http://169.254.169.254/latest/meta-data/ で IMDS 露出
+@app.route('/tools/fetch')
+def tools_fetch_legacy():
+    url = request.args.get('url', '')
+    if not url:
+        return Response('''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>ファームウェア更新チェック</title></head>
+<body style="font-family:Arial;max-width:700px;margin:40px auto">
+<h1>ファームウェア更新チェック</h1>
+<form method="GET" action="/tools/fetch">
+  <label>URL: <input type="text" name="url" value="https://vendor.example.com/firmware/latest.json" size="60"></label>
+  <button type="submit">取得</button>
+</form>
+</body></html>''', mimetype='text/html')
+
+    # VULN: SSRF - 任意URLを fetch、IMDS や内部ネットワークアクセス可
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'IoT-Portal/1.0'})
+        resp = urllib.request.urlopen(req, timeout=5)
+        body = resp.read(8192).decode('utf-8', errors='replace')
+        status_code = resp.status
+        headers_str = '\n'.join(f'{k}: {v}' for k, v in resp.headers.items())
+    except Exception as e:
+        body = str(e)
+        status_code = 0
+        headers_str = ''
+    return Response(f'''<!DOCTYPE html>
+<html><body>
+<h1>FW Fetch 結果</h1>
+<p>URL: <code>{url}</code></p>
+<p>Status: {status_code}</p>
+<pre>{headers_str}</pre>
+<pre style="background:#f5f5f5;padding:10px;max-height:400px;overflow:auto">{body}</pre>
+</body></html>''', mimetype='text/html')
+
+
 # ─────────── REST API版: クエリパラメータSQLi ───────────
 # VULN: GET /api/devices?q=X' OR '1'='1 で発火
 @app.route('/api/devices')
@@ -204,6 +329,11 @@ def sitemap():
   <url><loc>http://sub.3sec-demo.com/devices/1/logs</loc></url>
   <url><loc>http://sub.3sec-demo.com/devices/search</loc></url>
   <url><loc>http://sub.3sec-demo.com/devices/search?q=sensor</loc></url>
+  <url><loc>http://sub.3sec-demo.com/devices/lookup</loc></url>
+  <url><loc>http://sub.3sec-demo.com/devices/lookup?id=1</loc></url>
+  <url><loc>http://sub.3sec-demo.com/tools/ping</loc></url>
+  <url><loc>http://sub.3sec-demo.com/tools/ping?host=127.0.0.1</loc></url>
+  <url><loc>http://sub.3sec-demo.com/tools/fetch</loc></url>
   <url><loc>http://sub.3sec-demo.com/api/devices?q=sensor</loc></url>
   <url><loc>http://sub.3sec-demo.com/contact</loc></url>
   <url><loc>http://sub.3sec-demo.com/graphql</loc></url>
