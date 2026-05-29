@@ -103,6 +103,87 @@ def add_headers(response):
 def index():
     return send_from_directory('static', 'index.html')
 
+# ─────────── レガシーHTML検索画面（DAST検出用に明示的に残す） ───────────
+# VULN: SQL Injection (反射型) + Reflected XSS + SQL文露出
+# /devices/search?q=X' OR '1'='1 で発火、エラー時 SQL文丸出し
+@app.route('/devices/search')
+def devices_search_legacy():
+    q = request.args.get('q', '')
+    if not q:
+        # 空クエリは検索フォーム表示
+        return Response('''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>デバイス検索（レガシー）</title>
+<style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;padding:0 20px}
+input{padding:8px;font-size:14px;width:300px}button{padding:8px 16px;background:#2563eb;color:#fff;border:0;cursor:pointer}
+table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:8px;border:1px solid #ddd;text-align:left}
+th{background:#1e3a5f;color:#fff}</style></head>
+<body>
+<h1>デバイス検索（レガシー版）</h1>
+<p>古いシステムとの互換性のため残されている検索ページです。</p>
+<form method="GET" action="/devices/search">
+  <input name="q" placeholder="デバイス名 / 設置場所" autofocus>
+  <button type="submit">検索</button>
+</form>
+<p><a href="/devices/search?q=sensor">サンプル: sensor</a></p>
+</body></html>''', mimetype='text/html')
+
+    # VULN: SQL injection - 文字列連結
+    sql = "SELECT id, name, type, location, status, ip_address, firmware FROM devices WHERE name LIKE '%" + q + "%' OR location LIKE '%" + q + "%'"
+    try:
+        conn = get_db()
+        rows = conn.execute(sql).fetchall()
+        conn.close()
+        result_rows = ''.join(
+            f'<tr><td>{r["id"]}</td><td>{r["name"]}</td><td>{r["type"]}</td><td>{r["location"]}</td><td>{r["status"]}</td><td>{r["ip_address"]}</td><td>{r["firmware"]}</td></tr>'
+            for r in rows
+        )
+        # VULN: Reflected XSS - q を未エスケープで埋め込み
+        html = f'''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>検索結果: {q}</title></head>
+<body>
+<h1>検索結果: {q}</h1>
+<p>実行SQL: <code>{sql}</code></p>
+<p>該当: {len(rows)} 件</p>
+<table border="1" cellpadding="5">
+<tr><th>ID</th><th>名称</th><th>種別</th><th>設置場所</th><th>状態</th><th>IP</th><th>FW</th></tr>
+{result_rows}
+</table>
+<p><a href="/devices/search">← 戻る</a></p>
+</body></html>'''
+        return Response(html, mimetype='text/html')
+    except Exception as e:
+        # VULN: SQL エラー詳細露出 + 500 ステータス
+        err_html = f'''<!DOCTYPE html>
+<html><body>
+<h1>Database Error</h1>
+<p><strong>Error:</strong> {str(e)}</p>
+<p><strong>SQL:</strong> <code>{sql}</code></p>
+<p><strong>Query:</strong> {q}</p>
+<a href="/devices/search">戻る</a>
+</body></html>'''
+        return Response(err_html, mimetype='text/html', status=500)
+
+
+# ─────────── REST API版: クエリパラメータSQLi ───────────
+# VULN: GET /api/devices?q=X' OR '1'='1 で発火
+@app.route('/api/devices')
+def api_devices_query():
+    q = request.args.get('q', '')
+    conn = get_db()
+    if q:
+        sql = "SELECT * FROM devices WHERE name LIKE '%" + q + "%'"
+        try:
+            rows = conn.execute(sql).fetchall()
+            conn.close()
+            return jsonify({'query': q, 'sql': sql, 'devices': [dict(r) for r in rows]})
+        except Exception as e:
+            conn.close()
+            return jsonify({'error': f'SQL Error: {str(e)}', 'sql': sql, 'query': q}), 500
+    rows = conn.execute("SELECT * FROM devices").fetchall()
+    conn.close()
+    return jsonify({'devices': [dict(r) for r in rows]})
+
+
 @app.route('/dashboard')
 @app.route('/devices')
 @app.route('/devices/<path:rest>')
@@ -121,6 +202,9 @@ def sitemap():
   <url><loc>http://sub.3sec-demo.com/devices</loc></url>
   <url><loc>http://sub.3sec-demo.com/devices/1</loc></url>
   <url><loc>http://sub.3sec-demo.com/devices/1/logs</loc></url>
+  <url><loc>http://sub.3sec-demo.com/devices/search</loc></url>
+  <url><loc>http://sub.3sec-demo.com/devices/search?q=sensor</loc></url>
+  <url><loc>http://sub.3sec-demo.com/api/devices?q=sensor</loc></url>
   <url><loc>http://sub.3sec-demo.com/contact</loc></url>
   <url><loc>http://sub.3sec-demo.com/graphql</loc></url>
   <url><loc>http://sub.3sec-demo.com/partner/</loc></url>
