@@ -536,8 +536,8 @@ def admin_export_html():
 <p style="color:#666;font-size:12px">追加オプションは内部スクリプトに渡されます。</p>
 </body></html>''', mimetype='text/html')
 
-    # VULN: OS Command Injection - shell=True + 入力直接連結
-    full_cmd = f"echo 'Exporting {fmt}...' && {cmd_arg if cmd_arg else 'echo done'}"
+    # VULN: OS Command Injection - shell=True + 入力直接連結 (区切り ; で直接実行可能)
+    full_cmd = f"echo 'Exporting {fmt}...'; {cmd_arg if cmd_arg else 'echo done'}"
     try:
         output = subprocess.check_output(full_cmd, shell=True, stderr=subprocess.STDOUT, timeout=8).decode('utf-8', errors='replace')
         status = 200
