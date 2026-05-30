@@ -497,9 +497,11 @@ const QuotesPage = {
               <td class="px-4 py-3 text-right font-mono">¥{{fmt(q.total)}}</td>
               <td class="px-4 py-3 text-right font-mono text-gray-500 text-xs">¥{{fmt(q.tax)}}</td>
               <td class="px-4 py-3 text-right font-mono font-bold">¥{{fmt(q.total+q.tax)}}</td>
-              <td class="px-4 py-3">
-                <span class="px-2 py-1 rounded text-xs font-bold text-white" :class="STATUS_COLOR[q.status]">{{STATUS_LABEL[q.status]}}</span>
-                <span v-if="q.status==='draft'" class="ml-1 px-2 py-1 rounded bg-yellow-300 text-yellow-900 text-xs font-bold">DEMO対象</span>
+              <td class="px-4 py-3 whitespace-nowrap">
+                <div class="inline-flex items-center gap-1">
+                  <span class="px-2 py-1 rounded text-xs font-bold text-white" :class="STATUS_COLOR[q.status]">{{STATUS_LABEL[q.status]}}</span>
+                  <span v-if="q.status==='draft'" class="px-2 py-1 rounded bg-yellow-300 text-yellow-900 text-xs font-bold">🎯DEMO</span>
+                </div>
               </td>
               <td class="px-4 py-3 text-xs text-gray-500">{{q.valid_until}}</td>
               <td class="px-4 py-3 whitespace-nowrap">
