@@ -192,7 +192,7 @@ def sitemap():
   <url><loc>https://sub.3sec-demo.com/tools/import?url=https://example.com</loc></url>
   <url><loc>https://sub.3sec-demo.com/admin/export</loc></url>
   <url><loc>https://sub.3sec-demo.com/admin/export?format=csv</loc></url>
-  <url><loc>https://sub.3sec-demo.com/partner/</loc></url>
+  <url><loc>https://sub.3sec-demo.com/quotes/1/approve</loc></url>
   <url><loc>https://sub.3sec-demo.com/api/customers?id=1</loc></url>
 </urlset>"""
     return Response(xml, mimetype='application/xml')
@@ -546,109 +546,165 @@ def tools_import_html():
 
 
 # ═══════════════════════════════════════════════════════════
-# 手動巡回シナリオA: 代理店ポータル (DLR-XXXX + 1000-9999)
-# 自動巡回不可: 固定形式コード+範囲指定数値
+# 手動巡回シナリオ: 見積 上長承認フロー
+# 自動巡回不可: 4桁数字(1000-9999) + ラジオA/B/C + 必須チェックボックス2個
 # ═══════════════════════════════════════════════════════════
-PARTNER_CSS = """<style>
-body{font-family:'Helvetica Neue',sans-serif;margin:0;background:#f0f4ff;color:#1a2540}
-.partner-header{background:linear-gradient(135deg,#1e3a8a,#3730a3);padding:24px;color:#fff;box-shadow:0 4px 12px rgba(30,58,138,.2)}
-.partner-header h1{margin:0;font-size:22px}
-.partner-header p{margin:6px 0 0;color:#a5b4fc;font-size:13px}
-.container{max-width:920px;margin:0 auto;padding:28px}
-.card{background:#fff;border:1px solid #e0e7ff;border-radius:14px;padding:32px;margin-bottom:20px;box-shadow:0 6px 24px rgba(30,58,138,.08)}
-.form-group{margin-bottom:18px}
-.form-group label{display:block;font-size:13px;font-weight:700;color:#3730a3;margin-bottom:6px}
-.form-group input,.form-group select{width:100%;padding:11px 14px;border:2px solid #c7d2fe;border-radius:8px;font-size:14px;box-sizing:border-box}
-.form-group input:focus,.form-group select:focus{outline:none;border-color:#4f46e5}
-.form-group .hint{font-size:11px;color:#6b7280;margin-top:4px}
-.btn{padding:11px 28px;border:0;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer}
-.btn-primary{background:#4f46e5;color:#fff}
-.btn-primary:hover{background:#4338ca}
-.alert{padding:11px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
-.alert-danger{background:#fef2f2;border:1px solid #fecaca;color:#dc2626}
-.alert-success{background:#f0fdf4;border:1px solid #bbf7d0;color:#16a34a}
-table{width:100%;border-collapse:collapse}
-th{text-align:left;padding:10px 14px;background:#1e3a8a;color:#fff;font-size:12px}
-td{padding:10px 14px;border-bottom:1px solid #e0e7ff;font-size:13px}
-tr:nth-child(even) td{background:#f5f7ff}
+APPROVE_CSS = """<style>
+body{font-family:'Helvetica Neue',sans-serif;margin:0;background:#f0fdfa;color:#134e4a}
+.app-header{background:linear-gradient(135deg,#0f766e,#134e4a);padding:24px;color:#fff;box-shadow:0 4px 12px rgba(15,118,110,.25)}
+.app-header h1{margin:0;font-size:22px}
+.app-header p{margin:6px 0 0;color:#99f6e4;font-size:13px}
+.crumb{color:#99f6e4;font-size:12px;margin-bottom:6px}
+.crumb a{color:#5eead4;text-decoration:none}
+.container{max-width:760px;margin:0 auto;padding:28px}
+.card{background:#fff;border:1px solid #ccfbf1;border-radius:14px;padding:32px;margin-bottom:20px;box-shadow:0 6px 24px rgba(15,118,110,.08)}
+.quote-summary{background:#f0fdfa;border-left:4px solid #0d9488;padding:14px 18px;border-radius:8px;margin-bottom:24px}
+.quote-summary p{margin:2px 0;font-size:13px;color:#134e4a}
+.quote-summary strong{font-family:monospace;color:#0f766e}
+.form-group{margin-bottom:20px}
+.form-group label.lbl{display:block;font-size:13px;font-weight:700;color:#0f766e;margin-bottom:6px}
+.form-group input[type=text]{width:100%;padding:12px 14px;border:2px solid #99f6e4;border-radius:8px;font-size:15px;box-sizing:border-box;font-family:monospace;letter-spacing:2px}
+.form-group input[type=text]:focus{outline:none;border-color:#0d9488}
+.radio-group{display:flex;gap:10px;margin-top:8px}
+.radio-group label{flex:1;padding:14px;border:2px solid #ccfbf1;border-radius:8px;cursor:pointer;text-align:center;background:#fff;transition:all .15s}
+.radio-group label:hover{background:#f0fdfa}
+.radio-group input{display:none}
+.radio-group input:checked + .lbl-text{color:#0d9488}
+.radio-group label:has(input:checked){border-color:#0d9488;background:#f0fdfa}
+.checkbox-row{padding:14px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;margin-bottom:10px}
+.checkbox-row label{display:flex;gap:10px;cursor:pointer;font-size:13px;color:#134e4a;align-items:flex-start}
+.checkbox-row input{margin-top:3px}
+.required{background:#dc2626;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;margin-right:6px}
+.btn{padding:14px 30px;border:0;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;width:100%}
+.btn-primary{background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;box-shadow:0 4px 12px rgba(15,118,110,.3)}
+.alert-danger{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:12px 14px;border-radius:8px;font-size:13px;margin-bottom:16px}
+.hint{font-size:11px;color:#0f766e;margin-top:4px;font-family:monospace}
 </style>"""
 
-@app.route('/partner/', methods=['GET', 'POST'])
-def partner_login():
+@app.route('/quotes/<int:quote_id>/approve', methods=['GET', 'POST'])
+def quote_approve(quote_id):
+    conn = get_db()
+    quote = conn.execute("""SELECT q.*, c.company AS customer_company FROM quotes q
+                            LEFT JOIN customers c ON q.customer_id=c.id WHERE q.id=?""", (quote_id,)).fetchone()
+    conn.close()
+    if not quote:
+        return Response('<h1>404</h1>見積が見つかりません', mimetype='text/html', status=404)
+    quote = dict(quote)
     error = ''
+
     if request.method == 'POST':
-        dealer_code = request.form.get('dealer_code', '')
-        contract_number = request.form.get('contract_number', '')
+        approval_code = request.form.get('approval_code', '').strip()
+        rank = request.form.get('rank', '')
+        check_amount = request.form.get('check_amount') == 'on'
+        check_supervisor = request.form.get('check_supervisor') == 'on'
         import re
-        if not re.match(r'^DLR-\d{4}$', dealer_code):
-            error = '代理店コードの形式が正しくありません（DLR-XXXX 形式、Xは0-9の数字）'
-        elif not contract_number.isdigit() or not (1000 <= int(contract_number) <= 9999):
-            error = '契約番号は 1000〜9999 の整数で入力してください'
+        if not re.match(r'^\d{4}$', approval_code) or not (1000 <= int(approval_code) <= 9999):
+            error = '承認コードは 1000〜9999 の4桁数字で入力してください'
+        elif rank not in ('A', 'B', 'C'):
+            error = '決裁ランク (A / B / C) を選択してください'
+        elif not check_amount:
+            error = '「金額・条件を確認した」のチェックが必要です'
+        elif not check_supervisor:
+            error = '「上長確認済み」のチェックが必要です'
         else:
-            resp = redirect('/partner/dashboard')
-            # VULN: HttpOnly/Secure 無し、認可も formatだけ
-            resp.set_cookie('partner_session', f'{dealer_code}:{contract_number}', path='/partner/')
-            return resp
+            # 承認成功 → status 更新 + トークン付き完了画面へ
+            conn = get_db()
+            conn.execute("UPDATE quotes SET status='accepted' WHERE id=?", (quote_id,))
+            conn.commit()
+            conn.close()
+            import hashlib
+            token = hashlib.md5(f'{quote_id}-{approval_code}-{rank}'.encode()).hexdigest()[:12]
+            return redirect(f'/quotes/{quote_id}/approved?token={token}&rank={rank}')
+
     return Response(f'''<!DOCTYPE html>
-<html lang="ja"><head><meta charset="utf-8"><title>代理店ポータル - DAST Demo Site</title>{PARTNER_CSS}</head>
+<html lang="ja"><head><meta charset="utf-8"><title>見積上長承認 - DAST Demo Site</title>{APPROVE_CSS}</head>
 <body>
-<div class="partner-header"><h1>🤝 代理店ポータル</h1><p>販売パートナー向け管理画面</p></div>
+<div class="app-header">
+  <div class="crumb"><a href="/quotes">見積一覧</a> › <a href="/quotes/{quote_id}">{quote["ticket"]}</a> › 上長承認</div>
+  <h1>🔐 見積の上長承認</h1>
+  <p>承認ワークフロー - 必要な情報を入力してください</p>
+</div>
 <div class="container">
   <div class="card">
-    <h2 style="margin:0 0 6px;color:#1e3a8a">パートナーログイン</h2>
-    <p style="color:#6b7280;font-size:13px;margin:0 0 22px">代理店契約情報を入力してください</p>
-    {'<div class="alert alert-danger">'+error+'</div>' if error else ''}
-    <form method="POST" action="/partner/">
+    <div class="quote-summary">
+      <p>📋 対象見積</p>
+      <p><strong>{quote["ticket"]}</strong> ／ {quote["customer_company"]}</p>
+      <p style="font-size:14px"><strong>{quote["title"]}</strong></p>
+      <p style="font-size:14px">合計 <strong>¥{quote["total"]+quote["tax"]:,}</strong></p>
+    </div>
+    {'<div class="alert-danger">'+error+'</div>' if error else ''}
+    <form method="POST" action="/quotes/{quote_id}/approve">
       <div class="form-group">
-        <label>代理店コード <span style="color:#dc2626">*</span></label>
-        <input type="text" name="dealer_code" placeholder="DLR-0001" required>
-        <p class="hint">契約時に発行された代理店コード（DLR-XXXX 形式、Xは数字4桁）</p>
+        <label class="lbl"><span class="required">必須</span>承認コード</label>
+        <input type="text" name="approval_code" placeholder="1234" required maxlength="4" pattern="\\d{{4}}">
+        <p class="hint">1000〜9999 の4桁数字を入力</p>
       </div>
       <div class="form-group">
-        <label>契約番号 <span style="color:#dc2626">*</span></label>
-        <input type="text" name="contract_number" placeholder="1234" required>
-        <p class="hint">1000〜9999 の整数で入力してください</p>
+        <label class="lbl"><span class="required">必須</span>決裁ランク</label>
+        <div class="radio-group">
+          <label><input type="radio" name="rank" value="A"><div class="lbl-text"><strong>A</strong><br><span style="font-size:11px;color:#6b7280">¥10M以上</span></div></label>
+          <label><input type="radio" name="rank" value="B"><div class="lbl-text"><strong>B</strong><br><span style="font-size:11px;color:#6b7280">¥1M〜10M</span></div></label>
+          <label><input type="radio" name="rank" value="C"><div class="lbl-text"><strong>C</strong><br><span style="font-size:11px;color:#6b7280">¥1M未満</span></div></label>
+        </div>
       </div>
-      <button type="submit" class="btn btn-primary">ログイン</button>
+      <div class="checkbox-row">
+        <label><input type="checkbox" name="check_amount"> <span><span class="required">必須</span>金額・条件・有効期限を確認しました</span></label>
+      </div>
+      <div class="checkbox-row">
+        <label><input type="checkbox" name="check_supervisor"> <span><span class="required">必須</span>上長による承認確認済み（口頭/書面いずれか）</span></label>
+      </div>
+      <div class="checkbox-row" style="background:#fff">
+        <label><input type="checkbox" name="check_audit"> <span>監査ログへの記録に同意します（任意）</span></label>
+      </div>
+      <button type="submit" class="btn btn-primary">承認実行</button>
     </form>
   </div>
-  <div class="card" style="background:#fffbeb;border-color:#fde68a">
-    <p style="margin:0;font-size:12px;color:#92400e">💡 サンプル: 代理店コード <code>DLR-0001</code> / 契約番号 <code>1234</code></p>
+  <div class="card" style="background:#fefce8;border-color:#fde047">
+    <p style="margin:0;font-size:12px;color:#854d0e">💡 サンプル入力: 承認コード <code>1234</code> / 決裁ランク <code>B</code> / 両方チェック</p>
   </div>
 </div>
 </body></html>''', mimetype='text/html')
 
 
-@app.route('/partner/dashboard')
-def partner_dashboard():
-    session = request.cookies.get('partner_session', '')
-    if not session or ':' not in session:
-        return redirect('/partner/')
-    dealer_code, contract_number = session.split(':', 1)
+@app.route('/quotes/<int:quote_id>/approved')
+def quote_approved(quote_id):
+    token = request.args.get('token', '')
+    rank = request.args.get('rank', '')
+    if not token or len(token) != 12 or rank not in ('A', 'B', 'C'):
+        return redirect(f'/quotes/{quote_id}/approve')
     conn = get_db()
-    customers = conn.execute("SELECT * FROM customers LIMIT 5").fetchall()
-    quotes = conn.execute("""SELECT q.*, c.company AS customer_company FROM quotes q
-                             LEFT JOIN customers c ON q.customer_id=c.id ORDER BY q.id DESC LIMIT 5""").fetchall()
+    quote = conn.execute("""SELECT q.*, c.company AS customer_company FROM quotes q
+                            LEFT JOIN customers c ON q.customer_id=c.id WHERE q.id=?""", (quote_id,)).fetchone()
     conn.close()
-    customer_rows = ''.join(f'<tr><td>{c["id"]}</td><td><strong>{c["company"]}</strong></td><td>{c["industry"]}</td><td>{c["email"]}</td></tr>' for c in customers)
-    quote_rows = ''.join(f'<tr><td style="font-family:monospace;font-weight:bold;color:#4f46e5">{q["ticket"]}</td><td>{q["customer_company"]}</td><td>{q["title"]}</td><td style="text-align:right;font-family:monospace">¥{q["total"]:,}</td></tr>' for q in quotes)
+    if not quote:
+        return Response('<h1>404</h1>', mimetype='text/html', status=404)
+    quote = dict(quote)
     return Response(f'''<!DOCTYPE html>
-<html lang="ja"><head><meta charset="utf-8"><title>代理店ダッシュボード</title>{PARTNER_CSS}</head>
+<html lang="ja"><head><meta charset="utf-8"><title>承認完了 - DAST Demo Site</title>{APPROVE_CSS}</head>
 <body>
-<div class="partner-header">
-  <h1>🤝 代理店ダッシュボード</h1>
-  <p>代理店コード: <strong>{dealer_code}</strong> ／ 契約番号: <strong>{contract_number}</strong></p>
+<div class="app-header">
+  <div class="crumb"><a href="/quotes">見積一覧</a> › <a href="/quotes/{quote_id}">{quote["ticket"]}</a> › 承認完了</div>
+  <h1>✅ 承認完了</h1>
+  <p>見積が承認されました</p>
 </div>
 <div class="container">
-  <div class="card">
-    <h2 style="margin:0 0 14px;color:#1e3a8a">📋 担当顧客</h2>
-    <table><tr><th>ID</th><th>会社名</th><th>業種</th><th>メール</th></tr>{customer_rows}</table>
+  <div class="card" style="text-align:center">
+    <div style="font-size:80px;margin-bottom:16px">🎉</div>
+    <h2 style="color:#0f766e;margin:0 0 8px">承認されました</h2>
+    <p style="font-size:13px;color:#6b7280">承認トークン: <code style="background:#f0fdfa;padding:3px 8px;border-radius:4px;font-family:monospace">{token}</code></p>
+    <p style="font-size:13px;color:#6b7280;margin-top:6px">決裁ランク: <strong style="color:#0d9488">{rank}</strong></p>
+    <div class="quote-summary" style="text-align:left;margin-top:20px">
+      <p>📋 承認された見積</p>
+      <p><strong>{quote["ticket"]}</strong> ／ {quote["customer_company"]}</p>
+      <p style="font-size:14px">{quote["title"]}</p>
+      <p style="font-size:14px">合計 <strong>¥{quote["total"]+quote["tax"]:,}</strong></p>
+      <p style="font-size:12px;color:#6b7280;margin-top:6px">ステータス: <span style="color:#0d9488;font-weight:bold">受注</span> に更新されました</p>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:24px">
+      <a href="/quotes/{quote_id}" style="flex:1;padding:12px 20px;background:#0d9488;color:#fff;border-radius:8px;font-weight:bold;text-decoration:none">見積詳細へ</a>
+      <a href="/quotes" style="flex:1;padding:12px 20px;background:#e5e7eb;color:#374151;border-radius:8px;font-weight:bold;text-decoration:none">見積一覧へ</a>
+    </div>
   </div>
-  <div class="card">
-    <h2 style="margin:0 0 14px;color:#1e3a8a">💰 最近の見積</h2>
-    <table><tr><th>チケット</th><th>顧客</th><th>タイトル</th><th style="text-align:right">金額</th></tr>{quote_rows}</table>
-  </div>
-  <a href="/partner/" style="font-size:12px;color:#6b7280">← ログアウト（Cookie 削除して戻る）</a>
 </div>
 </body></html>''', mimetype='text/html')
 

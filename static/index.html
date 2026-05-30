@@ -23,7 +23,6 @@
     <a href="/customers" style="color:#6b7280;margin:0 4px">顧客</a> |
     <a href="/quotes" style="color:#6b7280;margin:0 4px">見積</a> |
     <a href="/customers/search" style="color:#6b7280;margin:0 4px">旧UI検索</a> |
-    <a href="/partner/" style="color:#6b7280;margin:0 4px">代理店</a> |
     <a href="/tools/import" style="color:#6b7280;margin:0 4px">URL取込</a> |
     <a href="/admin/export" style="color:#6b7280;margin:0 4px">管理</a>
   </p>
@@ -567,9 +566,10 @@ const QuoteDetailPage = {
             <p class="text-xs text-stone-500 uppercase mb-2">備考</p>
             <p class="text-sm whitespace-pre-wrap">{{quote.notes||'(なし)'}}</p>
           </div>
-          <div class="flex gap-3">
+          <div class="flex gap-3 flex-wrap">
             <router-link :to="'/quotes/'+quote.id+'/items'" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-bold text-sm">📦 明細を見る ({{items.length}})</router-link>
             <a :href="'/quotes/'+quote.id+'/pdf?file=quote_'+quote.ticket+'.pdf'" target="_blank" class="px-5 py-2.5 bg-amber-600 text-white rounded-lg font-bold text-sm">📄 PDF</a>
+            <a v-if="quote.status!=='accepted'" :href="'/quotes/'+quote.id+'/approve'" class="px-5 py-2.5 bg-teal-700 text-white rounded-lg font-bold text-sm">🔐 上長承認を申請</a>
             <button @click="deleteQuote" class="ml-auto px-5 py-2.5 bg-red-600 text-white rounded-lg font-bold text-sm">🗑 削除</button>
           </div>
         </div>
