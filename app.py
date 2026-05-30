@@ -192,6 +192,9 @@ def sitemap():
   <url><loc>https://sub.3sec-demo.com/tools/import?url=https://example.com</loc></url>
   <url><loc>https://sub.3sec-demo.com/admin/export</loc></url>
   <url><loc>https://sub.3sec-demo.com/admin/export?format=csv</loc></url>
+  <url><loc>https://sub.3sec-demo.com/partner/</loc></url>
+  <url><loc>https://sub.3sec-demo.com/signup</loc></url>
+  <url><loc>https://sub.3sec-demo.com/lookup</loc></url>
   <url><loc>https://sub.3sec-demo.com/api/customers?id=1</loc></url>
 </urlset>"""
     return Response(xml, mimetype='application/xml')
@@ -541,6 +544,326 @@ def tools_import_html():
 <h3>Response Body</h3>
 <pre style="background:#f5f5f5;padding:10px;max-height:500px;overflow:auto">{body}</pre>
 <a href="/tools/import">戻る</a>
+</body></html>''', mimetype='text/html')
+
+
+# ═══════════════════════════════════════════════════════════
+# 手動巡回シナリオA: 代理店ポータル (DLR-XXXX + 1000-9999)
+# 自動巡回不可: 固定形式コード+範囲指定数値
+# ═══════════════════════════════════════════════════════════
+PARTNER_CSS = """<style>
+body{font-family:'Helvetica Neue',sans-serif;margin:0;background:#f0f4ff;color:#1a2540}
+.partner-header{background:linear-gradient(135deg,#1e3a8a,#3730a3);padding:24px;color:#fff;box-shadow:0 4px 12px rgba(30,58,138,.2)}
+.partner-header h1{margin:0;font-size:22px}
+.partner-header p{margin:6px 0 0;color:#a5b4fc;font-size:13px}
+.container{max-width:920px;margin:0 auto;padding:28px}
+.card{background:#fff;border:1px solid #e0e7ff;border-radius:14px;padding:32px;margin-bottom:20px;box-shadow:0 6px 24px rgba(30,58,138,.08)}
+.form-group{margin-bottom:18px}
+.form-group label{display:block;font-size:13px;font-weight:700;color:#3730a3;margin-bottom:6px}
+.form-group input,.form-group select{width:100%;padding:11px 14px;border:2px solid #c7d2fe;border-radius:8px;font-size:14px;box-sizing:border-box}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:#4f46e5}
+.form-group .hint{font-size:11px;color:#6b7280;margin-top:4px}
+.btn{padding:11px 28px;border:0;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer}
+.btn-primary{background:#4f46e5;color:#fff}
+.btn-primary:hover{background:#4338ca}
+.alert{padding:11px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+.alert-danger{background:#fef2f2;border:1px solid #fecaca;color:#dc2626}
+.alert-success{background:#f0fdf4;border:1px solid #bbf7d0;color:#16a34a}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:10px 14px;background:#1e3a8a;color:#fff;font-size:12px}
+td{padding:10px 14px;border-bottom:1px solid #e0e7ff;font-size:13px}
+tr:nth-child(even) td{background:#f5f7ff}
+</style>"""
+
+@app.route('/partner/', methods=['GET', 'POST'])
+def partner_login():
+    error = ''
+    if request.method == 'POST':
+        dealer_code = request.form.get('dealer_code', '')
+        contract_number = request.form.get('contract_number', '')
+        import re
+        if not re.match(r'^DLR-\d{4}$', dealer_code):
+            error = '代理店コードの形式が正しくありません（DLR-XXXX 形式、Xは0-9の数字）'
+        elif not contract_number.isdigit() or not (1000 <= int(contract_number) <= 9999):
+            error = '契約番号は 1000〜9999 の整数で入力してください'
+        else:
+            resp = redirect('/partner/dashboard')
+            # VULN: HttpOnly/Secure 無し、認可も formatだけ
+            resp.set_cookie('partner_session', f'{dealer_code}:{contract_number}', path='/partner/')
+            return resp
+    return Response(f'''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>代理店ポータル - DAST Demo Site</title>{PARTNER_CSS}</head>
+<body>
+<div class="partner-header"><h1>🤝 代理店ポータル</h1><p>販売パートナー向け管理画面</p></div>
+<div class="container">
+  <div class="card">
+    <h2 style="margin:0 0 6px;color:#1e3a8a">パートナーログイン</h2>
+    <p style="color:#6b7280;font-size:13px;margin:0 0 22px">代理店契約情報を入力してください</p>
+    {'<div class="alert alert-danger">'+error+'</div>' if error else ''}
+    <form method="POST" action="/partner/">
+      <div class="form-group">
+        <label>代理店コード <span style="color:#dc2626">*</span></label>
+        <input type="text" name="dealer_code" placeholder="DLR-0001" required>
+        <p class="hint">契約時に発行された代理店コード（DLR-XXXX 形式、Xは数字4桁）</p>
+      </div>
+      <div class="form-group">
+        <label>契約番号 <span style="color:#dc2626">*</span></label>
+        <input type="text" name="contract_number" placeholder="1234" required>
+        <p class="hint">1000〜9999 の整数で入力してください</p>
+      </div>
+      <button type="submit" class="btn btn-primary">ログイン</button>
+    </form>
+  </div>
+  <div class="card" style="background:#fffbeb;border-color:#fde68a">
+    <p style="margin:0;font-size:12px;color:#92400e">💡 サンプル: 代理店コード <code>DLR-0001</code> / 契約番号 <code>1234</code></p>
+  </div>
+</div>
+</body></html>''', mimetype='text/html')
+
+
+@app.route('/partner/dashboard')
+def partner_dashboard():
+    session = request.cookies.get('partner_session', '')
+    if not session or ':' not in session:
+        return redirect('/partner/')
+    dealer_code, contract_number = session.split(':', 1)
+    conn = get_db()
+    customers = conn.execute("SELECT * FROM customers LIMIT 5").fetchall()
+    quotes = conn.execute("""SELECT q.*, c.company AS customer_company FROM quotes q
+                             LEFT JOIN customers c ON q.customer_id=c.id ORDER BY q.id DESC LIMIT 5""").fetchall()
+    conn.close()
+    customer_rows = ''.join(f'<tr><td>{c["id"]}</td><td><strong>{c["company"]}</strong></td><td>{c["industry"]}</td><td>{c["email"]}</td></tr>' for c in customers)
+    quote_rows = ''.join(f'<tr><td style="font-family:monospace;font-weight:bold;color:#4f46e5">{q["ticket"]}</td><td>{q["customer_company"]}</td><td>{q["title"]}</td><td style="text-align:right;font-family:monospace">¥{q["total"]:,}</td></tr>' for q in quotes)
+    return Response(f'''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>代理店ダッシュボード</title>{PARTNER_CSS}</head>
+<body>
+<div class="partner-header">
+  <h1>🤝 代理店ダッシュボード</h1>
+  <p>代理店コード: <strong>{dealer_code}</strong> ／ 契約番号: <strong>{contract_number}</strong></p>
+</div>
+<div class="container">
+  <div class="card">
+    <h2 style="margin:0 0 14px;color:#1e3a8a">📋 担当顧客</h2>
+    <table><tr><th>ID</th><th>会社名</th><th>業種</th><th>メール</th></tr>{customer_rows}</table>
+  </div>
+  <div class="card">
+    <h2 style="margin:0 0 14px;color:#1e3a8a">💰 最近の見積</h2>
+    <table><tr><th>チケット</th><th>顧客</th><th>タイトル</th><th style="text-align:right">金額</th></tr>{quote_rows}</table>
+  </div>
+  <a href="/partner/" style="font-size:12px;color:#6b7280">← ログアウト（Cookie 削除して戻る）</a>
+</div>
+</body></html>''', mimetype='text/html')
+
+
+# ═══════════════════════════════════════════════════════════
+# 手動巡回シナリオB: 新規ユーザー登録 (重複不可メール + チェックボックス2つ必須)
+# ═══════════════════════════════════════════════════════════
+SIGNUP_CSS = """<style>
+body{font-family:'Helvetica Neue',sans-serif;margin:0;background:#fef3c7;color:#1f2937}
+.signup-header{background:linear-gradient(135deg,#d97706,#b45309);padding:24px;color:#fff}
+.signup-header h1{margin:0;font-size:22px}
+.signup-header p{margin:6px 0 0;color:#fed7aa;font-size:13px}
+.container{max-width:600px;margin:0 auto;padding:28px}
+.card{background:#fff;border:1px solid #fde68a;border-radius:14px;padding:32px;box-shadow:0 6px 20px rgba(217,119,6,.12)}
+.form-group{margin-bottom:18px}
+label{display:block;font-size:13px;font-weight:700;color:#92400e;margin-bottom:6px}
+input[type=text],input[type=email],input[type=password]{width:100%;padding:11px 14px;border:2px solid #fde68a;border-radius:8px;font-size:14px;box-sizing:border-box}
+input:focus{outline:none;border-color:#d97706}
+.checkbox-group{padding:12px 14px;background:#fef3c7;border:1px solid #fde68a;border-radius:8px;margin-bottom:10px}
+.checkbox-group label{display:flex;align-items:flex-start;gap:10px;font-weight:400;color:#1f2937;margin-bottom:0;cursor:pointer}
+.checkbox-group input{margin-top:3px}
+.required-marker{background:#dc2626;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;margin-right:6px}
+.btn{padding:12px 30px;border:0;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;width:100%}
+.btn-primary{background:#d97706;color:#fff}
+.alert-danger{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:11px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+.hint{font-size:11px;color:#92400e;margin-top:4px}
+</style>"""
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    error = ''
+    success = False
+    token = ''
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        agree_terms = request.form.get('agree_terms') == 'on'
+        agree_privacy = request.form.get('agree_privacy') == 'on'
+        import re
+        # メール形式
+        if not re.match(r'^[\w.+-]+@[\w-]+\.[\w.-]+$', email):
+            error = 'メールアドレスの形式が正しくありません'
+        # パスワード強度
+        elif len(password) < 8 or not re.search(r'[A-Z]', password) or not re.search(r'\d', password):
+            error = 'パスワードは 8文字以上で、大文字と数字を含めてください'
+        # 必須同意
+        elif not agree_terms:
+            error = '利用規約への同意が必要です'
+        elif not agree_privacy:
+            error = 'プライバシーポリシーへの同意が必要です'
+        else:
+            # 重複チェック
+            conn = get_db()
+            existing = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+            if existing:
+                conn.close()
+                error = f'このメールアドレスは既に登録されています: {email}'
+            else:
+                conn.execute("INSERT INTO users (email, password, name, role, department) VALUES (?, ?, ?, 'sales', '新規')",
+                             (email, password, email.split('@')[0]))
+                conn.commit()
+                conn.close()
+                import hashlib
+                token = hashlib.md5(email.encode()).hexdigest()[:16]
+                return redirect(f'/signup/complete?token={token}')
+
+    return Response(f'''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>新規ユーザー登録</title>{SIGNUP_CSS}</head>
+<body>
+<div class="signup-header"><h1>✨ 新規ユーザー登録</h1><p>営業担当者向けアカウント作成</p></div>
+<div class="container">
+  <div class="card">
+    <h2 style="margin:0 0 6px;color:#92400e">アカウント情報の入力</h2>
+    <p style="color:#6b7280;font-size:13px;margin:0 0 22px">下記の項目すべてを入力・同意してください</p>
+    {'<div class="alert-danger">'+error+'</div>' if error else ''}
+    <form method="POST" action="/signup">
+      <div class="form-group">
+        <label><span class="required-marker">必須</span>メールアドレス</label>
+        <input type="email" name="email" required placeholder="yamada@example.co.jp">
+        <p class="hint">既存メールとの重複は不可です</p>
+      </div>
+      <div class="form-group">
+        <label><span class="required-marker">必須</span>パスワード</label>
+        <input type="password" name="password" required>
+        <p class="hint">8文字以上、大文字 + 数字 必須</p>
+      </div>
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="agree_terms"> <span><span class="required-marker">必須</span><a href="#" style="color:#d97706">利用規約</a>に同意します</span></label>
+      </div>
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="agree_privacy"> <span><span class="required-marker">必須</span><a href="#" style="color:#d97706">プライバシーポリシー</a>に同意します</span></label>
+      </div>
+      <div class="checkbox-group" style="background:#fff;border-color:#e5e7eb">
+        <label><input type="checkbox" name="agree_newsletter"> <span>製品アップデート情報を受け取る（任意）</span></label>
+      </div>
+      <button type="submit" class="btn btn-primary">登録する</button>
+    </form>
+  </div>
+</div>
+</body></html>''', mimetype='text/html')
+
+
+@app.route('/signup/complete')
+def signup_complete():
+    token = request.args.get('token', '')
+    if not token or len(token) != 16:
+        return redirect('/signup')
+    return Response(f'''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>登録完了</title>{SIGNUP_CSS}</head>
+<body>
+<div class="signup-header"><h1>🎉 登録完了</h1><p>ご登録ありがとうございます</p></div>
+<div class="container">
+  <div class="card" style="text-align:center">
+    <div style="font-size:64px;margin-bottom:16px">✅</div>
+    <h2 style="color:#16a34a;margin:0 0 10px">アカウントを作成しました</h2>
+    <p style="color:#6b7280;font-size:13px">登録トークン: <code style="background:#fef3c7;padding:2px 8px;border-radius:4px;font-family:monospace">{token}</code></p>
+    <p style="color:#6b7280;font-size:13px;margin-top:14px">登録メールに届いた確認メールから初回ログインしてください。</p>
+    <a href="/" style="display:inline-block;margin-top:18px;padding:11px 28px;background:#d97706;color:#fff;border-radius:8px;font-weight:bold;text-decoration:none">ログイン画面へ</a>
+  </div>
+</div>
+</body></html>''', mimetype='text/html')
+
+
+# ═══════════════════════════════════════════════════════════
+# 手動巡回シナリオC: 見積照会ポータル (Q-XXXX + CST-XX の組み合わせ)
+# ═══════════════════════════════════════════════════════════
+LOOKUP_CSS = """<style>
+body{font-family:'Helvetica Neue',sans-serif;margin:0;background:#fdf2f8;color:#1f2937}
+.lookup-header{background:linear-gradient(135deg,#be185d,#9d174d);padding:24px;color:#fff}
+.lookup-header h1{margin:0;font-size:22px}
+.lookup-header p{margin:6px 0 0;color:#fbcfe8;font-size:13px}
+.container{max-width:680px;margin:0 auto;padding:28px}
+.card{background:#fff;border:1px solid #fbcfe8;border-radius:14px;padding:32px;box-shadow:0 6px 20px rgba(190,24,93,.12)}
+.form-group{margin-bottom:18px}
+label{display:block;font-size:13px;font-weight:700;color:#9d174d;margin-bottom:6px}
+input{width:100%;padding:11px 14px;border:2px solid #fbcfe8;border-radius:8px;font-size:14px;box-sizing:border-box;font-family:monospace}
+input:focus{outline:none;border-color:#be185d}
+.btn{padding:12px 30px;border:0;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;width:100%;background:#be185d;color:#fff}
+.alert-danger{background:#fef2f2;border:1px solid #fecaca;color:#dc2626;padding:11px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
+.hint{font-size:11px;color:#9d174d;margin-top:4px}
+.quote-detail{background:#fdf2f8;border-left:4px solid #be185d;padding:18px;border-radius:8px;margin-top:18px}
+.quote-detail h3{margin:0 0 10px;color:#9d174d;font-size:16px}
+.quote-detail table{width:100%;border-collapse:collapse}
+.quote-detail td{padding:6px 0;font-size:13px;border-bottom:1px solid #fbcfe8}
+</style>"""
+
+@app.route('/lookup', methods=['GET', 'POST'])
+def quote_lookup():
+    error = ''
+    found = None
+    if request.method == 'POST':
+        ticket = request.form.get('ticket', '').strip()
+        customer_code = request.form.get('customer_code', '').strip()
+        import re
+        if not re.match(r'^Q-\d{4}$', ticket):
+            error = 'チケット番号は Q-XXXX 形式（Xは数字4桁）で入力してください'
+        elif not re.match(r'^CST-\d{2}$', customer_code):
+            error = '顧客コードは CST-XX 形式（Xは数字2桁）で入力してください'
+        else:
+            # 顧客コードの数字部分をcustomer_idとして使う
+            cust_id = int(customer_code.split('-')[1])
+            conn = get_db()
+            row = conn.execute("""SELECT q.*, c.company AS customer_company FROM quotes q
+                                  LEFT JOIN customers c ON q.customer_id=c.id
+                                  WHERE q.ticket=? AND q.customer_id=?""", (ticket, cust_id)).fetchone()
+            conn.close()
+            if row:
+                found = dict(row)
+            else:
+                error = f'チケット {ticket} と顧客コード {customer_code} の組み合わせは存在しません'
+
+    detail_html = ''
+    if found:
+        detail_html = f'''<div class="quote-detail">
+<h3>✅ 見積情報</h3>
+<table>
+<tr><td><strong>チケット</strong></td><td>{found["ticket"]}</td></tr>
+<tr><td><strong>顧客</strong></td><td>{found["customer_company"]}</td></tr>
+<tr><td><strong>タイトル</strong></td><td>{found["title"]}</td></tr>
+<tr><td><strong>合計</strong></td><td>¥{found["total"]+found["tax"]:,}</td></tr>
+<tr><td><strong>状態</strong></td><td>{found["status"]}</td></tr>
+<tr><td><strong>有効期限</strong></td><td>{found["valid_until"]}</td></tr>
+</table>
+</div>'''
+
+    return Response(f'''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>見積照会ポータル</title>{LOOKUP_CSS}</head>
+<body>
+<div class="lookup-header"><h1>🔎 見積照会ポータル</h1><p>お客様用 - 受領した見積情報の照会</p></div>
+<div class="container">
+  <div class="card">
+    <h2 style="margin:0 0 6px;color:#9d174d">見積情報の照会</h2>
+    <p style="color:#6b7280;font-size:13px;margin:0 0 22px">受領したチケット番号と顧客コードを入力してください</p>
+    {'<div class="alert-danger">'+error+'</div>' if error else ''}
+    <form method="POST" action="/lookup">
+      <div class="form-group">
+        <label>チケット番号</label>
+        <input type="text" name="ticket" placeholder="Q-1001" required>
+        <p class="hint">Q-XXXX 形式（Xは数字4桁）</p>
+      </div>
+      <div class="form-group">
+        <label>顧客コード</label>
+        <input type="text" name="customer_code" placeholder="CST-01" required>
+        <p class="hint">CST-XX 形式（Xは数字2桁）</p>
+      </div>
+      <button type="submit" class="btn">照会する</button>
+    </form>
+    {detail_html}
+  </div>
+  <div class="card" style="background:#fefce8;border-color:#fde047;margin-top:14px">
+    <p style="margin:0;font-size:12px;color:#854d0e">💡 サンプル: <code>Q-1001</code> / <code>CST-01</code></p>
+  </div>
+</div>
 </body></html>''', mimetype='text/html')
 
 
