@@ -203,9 +203,12 @@ def robots():
     return Response("""User-agent: *
 Allow: /
 Disallow: /admin/
+Disallow: /admin/reset
 Disallow: /quotes/new
 Disallow: /quotes/confirm
 Disallow: /quotes/complete
+Disallow: /quotes/*/approve
+Disallow: /quotes/*/approved
 Disallow: /api/quotes/submit
 Disallow: /api/quotes/confirm
 Disallow: /api/quotes/by-ticket/
@@ -707,6 +710,56 @@ def quote_approved(quote_id):
   </div>
 </div>
 </body></html>''', mimetype='text/html')
+
+
+# ═══════════════════════════════════════════════════════════
+# 管理者: デモデータリセット
+# 初期データ（顧客6社/見積10件/担当者9名）に戻す
+# ═══════════════════════════════════════════════════════════
+@app.route('/admin/reset', methods=['GET', 'POST'])
+def admin_reset():
+    if request.method == 'POST':
+        init_db()
+        return Response('''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>リセット完了</title>
+<style>body{font-family:'Helvetica Neue',sans-serif;background:#f0fdfa;margin:0;padding:60px 20px;text-align:center}
+.box{max-width:500px;margin:0 auto;background:#fff;padding:40px;border-radius:14px;box-shadow:0 6px 24px rgba(15,118,110,.15)}
+h1{color:#0f766e;margin:0 0 12px}
+.btn{display:inline-block;padding:12px 28px;background:#0f766e;color:#fff;border-radius:8px;font-weight:bold;text-decoration:none;margin-top:18px}</style>
+</head><body>
+<div class="box">
+<div style="font-size:60px">🔄</div>
+<h1>デモデータをリセットしました</h1>
+<p style="color:#6b7280;font-size:13px">顧客6社・見積10件・担当者9名 を初期状態に戻しました。</p>
+<a href="/dashboard" class="btn">ダッシュボードへ</a>
+</div></body></html>''', mimetype='text/html')
+
+    return Response('''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>デモデータリセット</title>
+<style>body{font-family:'Helvetica Neue',sans-serif;background:#fff7ed;margin:0;padding:60px 20px;text-align:center}
+.box{max-width:520px;margin:0 auto;background:#fff;padding:36px;border-radius:14px;box-shadow:0 6px 24px rgba(180,83,9,.15);border:2px solid #fed7aa}
+h1{color:#9a3412;margin:0 0 10px}
+.warn{background:#fef3c7;border-left:4px solid #d97706;padding:12px 14px;border-radius:6px;text-align:left;margin:18px 0;font-size:13px;color:#92400e}
+.btn{padding:13px 30px;border:0;border-radius:8px;font-weight:bold;cursor:pointer;font-size:14px}
+.btn-danger{background:#dc2626;color:#fff}
+.btn-secondary{background:#e5e7eb;color:#374151;text-decoration:none;display:inline-block}</style>
+</head><body>
+<div class="box">
+<div style="font-size:60px">⚠️</div>
+<h1>デモデータをリセットしますか？</h1>
+<div class="warn">
+<strong>以下のデータがすべて消去され、初期状態に戻ります：</strong><br>
+・追加した見積（Q-1011以降など）<br>
+・承認したステータス変更<br>
+・新規追加した顧客・担当者<br>
+・テスト用に投入されたデータ
+</div>
+<p style="color:#6b7280;font-size:12px">※ デモ前に実行することを推奨します</p>
+<form method="POST" action="/admin/reset" style="margin-top:16px;display:flex;gap:10px;justify-content:center">
+<a href="/dashboard" class="btn btn-secondary">キャンセル</a>
+<button type="submit" class="btn btn-danger">🔄 リセット実行</button>
+</form>
+</div></body></html>''', mimetype='text/html')
 
 
 # ═══════════════════════════════════════════════════════════
