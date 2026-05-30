@@ -477,6 +477,13 @@ const QuotesPage = {
       </div>
     </div>
     <main class="max-w-6xl mx-auto px-6 -mt-6">
+      <!-- DAST デモ案内 -->
+      <div class="mb-4 p-4 rounded-xl bg-amber-50 border-2 border-dashed border-amber-400 flex items-center gap-3">
+        <span class="text-2xl">🎯</span>
+        <div class="flex-1 text-sm text-amber-900">
+          <strong>DAST 手動巡回デモ：</strong>「下書き」状態の見積（行末に <span class="px-2 py-0.5 rounded bg-yellow-300 text-yellow-900 text-xs font-bold">DEMO対象</span> マーク）を開くと、上長承認シナリオが体験できます
+        </div>
+      </div>
       <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-violet-100">
         <table class="w-full text-sm">
           <thead><tr class="bg-violet-800 text-white">
@@ -490,7 +497,10 @@ const QuotesPage = {
               <td class="px-4 py-3 text-right font-mono">¥{{fmt(q.total)}}</td>
               <td class="px-4 py-3 text-right font-mono text-gray-500 text-xs">¥{{fmt(q.tax)}}</td>
               <td class="px-4 py-3 text-right font-mono font-bold">¥{{fmt(q.total+q.tax)}}</td>
-              <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-bold text-white" :class="STATUS_COLOR[q.status]">{{STATUS_LABEL[q.status]}}</span></td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-1 rounded text-xs font-bold text-white" :class="STATUS_COLOR[q.status]">{{STATUS_LABEL[q.status]}}</span>
+                <span v-if="q.status==='draft'" class="ml-1 px-2 py-1 rounded bg-yellow-300 text-yellow-900 text-xs font-bold">DEMO対象</span>
+              </td>
               <td class="px-4 py-3 text-xs text-gray-500">{{q.valid_until}}</td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <router-link :to="'/quotes/'+q.id" class="text-violet-700 text-xs underline mr-3">詳細</router-link>
@@ -529,6 +539,18 @@ const QuoteDetailPage = {
       </div>
     </div>
     <main class="max-w-4xl mx-auto px-6 py-8" v-if="quote">
+      <!-- DAST デモ手動巡回案内 (draft 状態のときだけ表示) -->
+      <div v-if="quote.status!=='accepted'" class="mb-5 p-5 rounded-2xl bg-gradient-to-r from-yellow-100 to-amber-100 border-2 border-dashed border-amber-500 shadow-lg">
+        <div class="flex items-start gap-3">
+          <div class="text-3xl">🎯</div>
+          <div class="flex-1">
+            <p class="font-black text-amber-900 text-base mb-1">DAST デモ：手動巡回シナリオはここから！</p>
+            <p class="text-sm text-amber-800">下の <strong>🔐 上長承認を申請</strong> ボタンを押すと、自動巡回では到達できない画面に進みます。</p>
+          </div>
+          <a :href="'/quotes/'+quote.id+'/approve'" class="px-5 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black text-sm shadow-md whitespace-nowrap">▶ 承認画面へ</a>
+        </div>
+      </div>
+
       <div class="bg-white shadow-2xl rounded-lg overflow-hidden">
         <div class="ticket-stub px-8 py-6 border-b-4 border-dashed border-amber-300 flex justify-between items-center">
           <div>

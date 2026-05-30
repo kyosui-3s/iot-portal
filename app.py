@@ -613,7 +613,17 @@ def quote_approve(quote_id):
             return redirect(f'/quotes/{quote_id}/approved?token={token}&rank={rank}')
 
     return Response(f'''<!DOCTYPE html>
-<html lang="ja"><head><meta charset="utf-8"><title>見積上長承認 - DAST Demo Site</title>{APPROVE_CSS}</head>
+<html lang="ja"><head><meta charset="utf-8"><title>見積上長承認 - DAST Demo Site</title>{APPROVE_CSS}
+<style>
+.demo-banner{{background:linear-gradient(90deg,#fef3c7,#fde68a);border:3px dashed #d97706;padding:20px 24px;border-radius:14px;margin-bottom:24px}}
+.demo-banner h2{{margin:0 0 8px;color:#92400e;font-size:18px}}
+.demo-banner p{{margin:0;color:#78350f;font-size:14px;line-height:1.7}}
+.step-list{{margin:12px 0 0;padding:0;list-style:none}}
+.step-list li{{padding:10px 14px;background:#fff;border:2px solid #fbbf24;border-radius:10px;margin-bottom:8px;font-size:14px;display:flex;align-items:center;gap:12px}}
+.step-num{{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:#d97706;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:15px}}
+.step-list code{{background:#fef3c7;padding:2px 8px;border-radius:4px;font-weight:bold;color:#dc2626;border:1px solid #fbbf24}}
+.field-hint-arrow{{display:inline-block;background:#dc2626;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:bold;margin-left:8px}}
+</style></head>
 <body>
 <div class="app-header">
   <div class="crumb"><a href="/quotes">見積一覧</a> › <a href="/quotes/{quote_id}">{quote["ticket"]}</a> › 上長承認</div>
@@ -621,6 +631,20 @@ def quote_approve(quote_id):
   <p>承認ワークフロー - 必要な情報を入力してください</p>
 </div>
 <div class="container">
+
+  <!-- ════════ デモ手順案内 (大バナー) ════════ -->
+  <div class="demo-banner">
+    <h2>🎯 これはDASTデモの「手動巡回シナリオ」画面です</h2>
+    <p>この画面より先（承認完了画面）は <strong>Securify の自動巡回では到達できません</strong>。手動でフォームを正しく入力する必要があります。</p>
+    <ol class="step-list">
+      <li><span class="step-num">1</span><div>「承認コード」に <code>1234</code> と入力</div></li>
+      <li><span class="step-num">2</span><div>「決裁ランク」で <code>B</code> をクリック</div></li>
+      <li><span class="step-num">3</span><div>必須チェックボックス <code>2つ</code>（金額確認・上長確認）にチェック</div></li>
+      <li><span class="step-num">4</span><div>下の <code>緑色の「承認実行」ボタン</code> をクリック</div></li>
+    </ol>
+    <p style="margin-top:12px;font-size:12px;color:#78350f">⚠️ どれか1つでも欠けると承認エラーになり次画面には進めません</p>
+  </div>
+
   <div class="card">
     <div class="quote-summary">
       <p>📋 対象見積</p>
@@ -631,32 +655,33 @@ def quote_approve(quote_id):
     {'<div class="alert-danger">'+error+'</div>' if error else ''}
     <form method="POST" action="/quotes/{quote_id}/approve">
       <div class="form-group">
-        <label class="lbl"><span class="required">必須</span>承認コード</label>
-        <input type="text" name="approval_code" placeholder="1234" required maxlength="4" pattern="\\d{{4}}">
+        <label class="lbl"><span class="required">必須</span>STEP 1: 承認コード <span class="field-hint-arrow">👉 1234 を入力</span></label>
+        <input type="text" name="approval_code" placeholder="ここに 1234 と入力" required maxlength="4" pattern="\\d{{4}}">
         <p class="hint">1000〜9999 の4桁数字を入力</p>
       </div>
       <div class="form-group">
-        <label class="lbl"><span class="required">必須</span>決裁ランク</label>
+        <label class="lbl"><span class="required">必須</span>STEP 2: 決裁ランク <span class="field-hint-arrow">👉 B を選択</span></label>
         <div class="radio-group">
           <label><input type="radio" name="rank" value="A"><div class="lbl-text"><strong>A</strong><br><span style="font-size:11px;color:#6b7280">¥10M以上</span></div></label>
-          <label><input type="radio" name="rank" value="B"><div class="lbl-text"><strong>B</strong><br><span style="font-size:11px;color:#6b7280">¥1M〜10M</span></div></label>
+          <label><input type="radio" name="rank" value="B"><div class="lbl-text"><strong>B 👈</strong><br><span style="font-size:11px;color:#6b7280">¥1M〜10M</span></div></label>
           <label><input type="radio" name="rank" value="C"><div class="lbl-text"><strong>C</strong><br><span style="font-size:11px;color:#6b7280">¥1M未満</span></div></label>
         </div>
       </div>
-      <div class="checkbox-row">
-        <label><input type="checkbox" name="check_amount"> <span><span class="required">必須</span>金額・条件・有効期限を確認しました</span></label>
+      <div class="form-group">
+        <label class="lbl"><span class="required">必須</span>STEP 3: 確認チェック <span class="field-hint-arrow">👉 2つ ☑️</span></label>
+        <div class="checkbox-row">
+          <label><input type="checkbox" name="check_amount"> <span><span class="required">必須</span>金額・条件・有効期限を確認しました</span></label>
+        </div>
+        <div class="checkbox-row">
+          <label><input type="checkbox" name="check_supervisor"> <span><span class="required">必須</span>上長による承認確認済み（口頭/書面いずれか）</span></label>
+        </div>
+        <div class="checkbox-row" style="background:#fff">
+          <label><input type="checkbox" name="check_audit"> <span>監査ログへの記録に同意します（<em>任意・チェック不要</em>）</span></label>
+        </div>
       </div>
-      <div class="checkbox-row">
-        <label><input type="checkbox" name="check_supervisor"> <span><span class="required">必須</span>上長による承認確認済み（口頭/書面いずれか）</span></label>
-      </div>
-      <div class="checkbox-row" style="background:#fff">
-        <label><input type="checkbox" name="check_audit"> <span>監査ログへの記録に同意します（任意）</span></label>
-      </div>
-      <button type="submit" class="btn btn-primary">承認実行</button>
+      <p style="text-align:center;margin:18px 0 10px;font-size:13px;color:#0f766e;font-weight:bold">⬇ STEP 4: 下のボタンをクリック ⬇</p>
+      <button type="submit" class="btn btn-primary">✅ 承認実行</button>
     </form>
-  </div>
-  <div class="card" style="background:#fefce8;border-color:#fde047">
-    <p style="margin:0;font-size:12px;color:#854d0e">💡 サンプル入力: 承認コード <code>1234</code> / 決裁ランク <code>B</code> / 両方チェック</p>
   </div>
 </div>
 </body></html>''', mimetype='text/html')
@@ -676,7 +701,12 @@ def quote_approved(quote_id):
         return Response('<h1>404</h1>', mimetype='text/html', status=404)
     quote = dict(quote)
     return Response(f'''<!DOCTYPE html>
-<html lang="ja"><head><meta charset="utf-8"><title>承認完了 - DAST Demo Site</title>{APPROVE_CSS}</head>
+<html lang="ja"><head><meta charset="utf-8"><title>承認完了 - DAST Demo Site</title>{APPROVE_CSS}
+<style>
+.demo-success{{background:linear-gradient(90deg,#d1fae5,#a7f3d0);border:3px dashed #10b981;padding:20px 24px;border-radius:14px;margin-bottom:24px}}
+.demo-success h2{{margin:0 0 8px;color:#065f46;font-size:18px}}
+.demo-success p{{margin:0;color:#064e3b;font-size:14px;line-height:1.7}}
+</style></head>
 <body>
 <div class="app-header">
   <div class="crumb"><a href="/quotes">見積一覧</a> › <a href="/quotes/{quote_id}">{quote["ticket"]}</a> › 承認完了</div>
@@ -684,6 +714,14 @@ def quote_approved(quote_id):
   <p>見積が承認されました</p>
 </div>
 <div class="container">
+
+  <!-- ════════ デモ成功バナー ════════ -->
+  <div class="demo-success">
+    <h2>🎉 手動巡回 成功！</h2>
+    <p>この画面（<code>/quotes/{quote_id}/approved?token=...</code>）は <strong>Securify の自動巡回マップには出ない画面</strong> です。<br>
+    手動でフォーム入力した後にだけ到達できるため、手動巡回機能を使わないと診断対象に含められません。</p>
+  </div>
+
   <div class="card" style="text-align:center">
     <div style="font-size:80px;margin-bottom:16px">🎉</div>
     <h2 style="color:#0f766e;margin:0 0 8px">承認されました</h2>
