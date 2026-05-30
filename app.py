@@ -53,9 +53,9 @@ def init_db():
 
     # ─── Users ───
     c.executemany("INSERT INTO users VALUES (?,?,?,?,?,?)", [
-        (1, 'admin@quoteflow.com', 'Admin123!', '管理者 太郎', 'admin', 'システム管理'),
-        (2, 'tanaka@quoteflow.com', 'User123!', '田中 営業', 'sales', '営業1課'),
-        (3, 'suzuki@quoteflow.com', 'User123!', '鈴木 営業', 'sales', '営業2課'),
+        (1, 'admin@3sec-demo.com', 'Admin123!', '管理者 太郎', 'admin', 'システム管理'),
+        (2, 'tanaka@3sec-demo.com', 'User123!', '田中 営業', 'sales', '営業1課'),
+        (3, 'suzuki@3sec-demo.com', 'User123!', '鈴木 営業', 'sales', '営業2課'),
     ])
     # ─── Customers ───
     c.executemany("INSERT INTO customers VALUES (?,?,?,?,?,?,?,?,?,?)", [
