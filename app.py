@@ -158,10 +158,17 @@ def index():
 
 @app.route('/dashboard')
 @app.route('/customers')
-@app.route('/customers/<path:rest>')
+@app.route('/customers/<int:cid>')
+@app.route('/customers/<int:cid>/contacts')
+@app.route('/customers/<int:cid>/contacts/<int:contact_id>')
+@app.route('/contacts/<int:contact_id>')
 @app.route('/quotes')
-@app.route('/quotes/<path:rest>')
-def spa_pages(rest=None):
+@app.route('/quotes/new')
+@app.route('/quotes/confirm')
+@app.route('/quotes/complete')
+@app.route('/quotes/<int:qid>')
+@app.route('/quotes/<int:qid>/items')
+def spa_pages(cid=None, contact_id=None, qid=None):
     return send_from_directory('static', 'index.html')
 
 
@@ -174,11 +181,11 @@ def sitemap():
   <url><loc>https://sub.3sec-demo.com/dashboard</loc></url>
   <url><loc>https://sub.3sec-demo.com/customers</loc></url>
   <url><loc>https://sub.3sec-demo.com/customers/1</loc></url>
-  <url><loc>https://sub.3sec-demo.com/customers/search</loc></url>
-  <url><loc>https://sub.3sec-demo.com/customers/search?q=sample</loc></url>
-  <url><loc>https://sub.3sec-demo.com/customers/lookup?id=1</loc></url>
+  <url><loc>https://sub.3sec-demo.com/customers/1/contacts</loc></url>
+  <url><loc>https://sub.3sec-demo.com/customers/1/contacts/1</loc></url>
   <url><loc>https://sub.3sec-demo.com/quotes</loc></url>
   <url><loc>https://sub.3sec-demo.com/quotes/1</loc></url>
+  <url><loc>https://sub.3sec-demo.com/quotes/1/items</loc></url>
   <url><loc>https://sub.3sec-demo.com/quotes/1/pdf?file=quote_Q-1001.pdf</loc></url>
   <url><loc>https://sub.3sec-demo.com/quotes/new</loc></url>
   <url><loc>https://sub.3sec-demo.com/tools/import</loc></url>
@@ -278,6 +285,49 @@ def api_customer_detail(customer_id):
         return jsonify({'error': '顧客が見つかりません', 'sql': sql}), 404
     except Exception as e:
         return jsonify({'error': 'mysql_fetch_array(): SQL syntax error near: ' + str(e), 'sql': sql}), 500
+
+
+@app.route('/api/customers/<customer_id>/contacts')
+def api_customer_contacts(customer_id):
+    # VULN: IDOR (認証なし) + SQLi via path param
+    sql = "SELECT * FROM contacts WHERE customer_id=" + customer_id
+    try:
+        conn = get_db()
+        rows = conn.execute(sql).fetchall()
+        cust = conn.execute("SELECT * FROM customers WHERE id=?", (customer_id if customer_id.isdigit() else 0,)).fetchone()
+        conn.close()
+        return jsonify({'customer': dict(cust) if cust else None, 'contacts': [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({'error': 'You have an error in your SQL syntax: ' + str(e), 'sql': sql}), 500
+
+
+@app.route('/api/contacts/<contact_id>')
+def api_contact_detail(contact_id):
+    # VULN: IDOR (認証なし) + SQLi via path param
+    sql = "SELECT ct.*, c.company AS customer_company FROM contacts ct LEFT JOIN customers c ON ct.customer_id=c.id WHERE ct.id=" + contact_id
+    try:
+        conn = get_db()
+        row = conn.execute(sql).fetchone()
+        conn.close()
+        if row:
+            return jsonify({'contact': dict(row)})
+        return jsonify({'error': '担当者が見つかりません', 'sql': sql}), 404
+    except Exception as e:
+        return jsonify({'error': 'mysql_fetch_array(): SQL syntax error: ' + str(e), 'sql': sql}), 500
+
+
+@app.route('/api/quotes/<quote_id>/items')
+def api_quote_items(quote_id):
+    # VULN: SQLi via path param
+    sql = "SELECT * FROM quote_items WHERE quote_id=" + quote_id
+    try:
+        conn = get_db()
+        rows = conn.execute(sql).fetchall()
+        q = conn.execute("SELECT q.*, c.company AS customer_company FROM quotes q LEFT JOIN customers c ON q.customer_id=c.id WHERE q.id=?", (quote_id if quote_id.isdigit() else 0,)).fetchone()
+        conn.close()
+        return jsonify({'quote': dict(q) if q else None, 'items': [dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({'error': 'You have an error in your SQL syntax: ' + str(e), 'sql': sql}), 500
 
 
 # ═══════════════════════════════════════════════════════════
@@ -449,55 +499,6 @@ table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:8px;bord
 <p><strong>SQL:</strong> <code>{sql}</code></p>
 <p><strong>Input q:</strong> {q}</p>
 <a href="/customers/search">戻る</a>
-</body></html>''', mimetype='text/html', status=500)
-
-
-# ═══════════════════════════════════════════════════════════
-# レガシーHTML: 顧客ID検索 (SQLi 数値 error-based)
-# ═══════════════════════════════════════════════════════════
-@app.route('/customers/lookup')
-def customers_lookup_html():
-    cid = request.args.get('id', '')
-    if not cid:
-        return Response('''<!DOCTYPE html>
-<html lang="ja"><head><meta charset="utf-8"><title>顧客ID検索</title></head>
-<body style="font-family:Arial;max-width:700px;margin:40px auto;padding:0 20px">
-<h1>顧客ID検索</h1>
-<form method="GET" action="/customers/lookup">
-  <label>ID: <input type="text" name="id" value="1" style="padding:8px;width:200px"></label>
-  <button type="submit" style="padding:8px 16px;background:#2563eb;color:#fff;border:0">検索</button>
-</form>
-</body></html>''', mimetype='text/html')
-
-    # VULN: SQLi 数値カラム error-based
-    sql = "SELECT id, name, company, industry, email, phone, annual_revenue FROM customers WHERE id=" + cid
-    try:
-        conn = get_db()
-        rows = conn.execute(sql).fetchall()
-        conn.close()
-        result_rows = ''.join(
-            f'<tr><td>{r["id"]}</td><td>{r["name"]}</td><td>{r["company"]}</td><td>{r["industry"]}</td><td>{r["email"]}</td><td>{r["phone"]}</td><td>{r["annual_revenue"]:,}</td></tr>'
-            for r in rows
-        )
-        return Response(f'''<!DOCTYPE html>
-<html><body style="font-family:Arial;max-width:900px;margin:40px auto;padding:0 20px">
-<h1>顧客ID={cid}</h1>
-<p>実行SQL: <code>{sql}</code></p>
-<p>該当: {len(rows)} 件</p>
-<table border="1" cellpadding="5">
-<tr><th>ID</th><th>担当者</th><th>会社名</th><th>業種</th><th>メール</th><th>電話</th><th>売上規模</th></tr>
-{result_rows}
-</table>
-<a href="/customers/lookup">戻る</a>
-</body></html>''', mimetype='text/html')
-    except Exception as e:
-        # VULN: 「You have an error in your SQL syntax」シグネチャ含む
-        return Response(f'''<!DOCTYPE html>
-<html><body>
-<h1>Database Error</h1>
-<p><strong>You have an error in your SQL syntax:</strong> {str(e)}</p>
-<p><strong>SQL:</strong> <code>{sql}</code></p>
-<p><strong>Input id:</strong> {cid}</p>
 </body></html>''', mimetype='text/html', status=500)
 
 

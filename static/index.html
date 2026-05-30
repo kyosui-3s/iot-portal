@@ -7,6 +7,12 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .bar { border-radius:6px 6px 0 0; transition:height .6s; }
+    .grid-pattern { background-image: linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px); background-size: 24px 24px; }
+    .ticket-stub { background: repeating-linear-gradient(45deg, #fff8e6, #fff8e6 12px, #ffeac0 12px, #ffeac0 14px); }
+    .glow { box-shadow: 0 0 40px rgba(99,102,241,.4); }
+  </style>
 </head>
 <body class="min-h-screen bg-slate-100">
 <div id="app"></div>
@@ -15,11 +21,10 @@
   <p>&copy; 2026 DAST Demo Site (見積システム) |
     <a href="/dashboard" style="color:#6b7280;margin:0 4px">ダッシュボード</a> |
     <a href="/customers" style="color:#6b7280;margin:0 4px">顧客</a> |
-    <a href="/customers/search" style="color:#6b7280;margin:0 4px">顧客検索（旧）</a> |
-    <a href="/customers/lookup" style="color:#6b7280;margin:0 4px">顧客ID検索</a> |
     <a href="/quotes" style="color:#6b7280;margin:0 4px">見積</a> |
+    <a href="/customers/search" style="color:#6b7280;margin:0 4px">旧UI検索</a> |
     <a href="/tools/import" style="color:#6b7280;margin:0 4px">URL取込</a> |
-    <a href="/admin/export" style="color:#6b7280;margin:0 4px">管理エクスポート</a>
+    <a href="/admin/export" style="color:#6b7280;margin:0 4px">管理</a>
   </p>
 </footer>
 
@@ -30,20 +35,21 @@ const { createRouter, createWebHistory, useRoute, useRouter } = VueRouter
 const fmt = n => new Intl.NumberFormat('ja-JP').format(n||0)
 const STATUS_LABEL = { draft:'下書き', sent:'送付済', accepted:'受注', rejected:'失注' }
 const STATUS_COLOR = { draft:'bg-gray-400', sent:'bg-blue-500', accepted:'bg-emerald-500', rejected:'bg-red-500' }
+const AVATAR_COLORS = ['bg-rose-500','bg-amber-500','bg-emerald-500','bg-sky-500','bg-violet-500','bg-pink-500','bg-teal-500','bg-orange-500']
 
 /* ─────────── 共通ヘッダー ─────────── */
 const AppHeader = {
   props:['current'],
-  template: `
-  <header class="bg-gradient-to-r from-indigo-800 to-indigo-600 sticky top-0 z-50 shadow-lg">
+  template:`
+  <header class="bg-gradient-to-r from-indigo-900 via-indigo-700 to-purple-700 sticky top-0 z-50 shadow-xl">
     <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-      <div class="flex items-center gap-8">
-        <router-link to="/dashboard" class="font-bold text-lg text-white tracking-wide flex items-center gap-2">📋 DAST Demo Site <span class="text-sm font-normal text-indigo-200">(見積システム)</span></router-link>
+      <div class="flex items-center gap-6">
+        <router-link to="/dashboard" class="font-bold text-lg text-white tracking-wide flex items-center gap-2">📋 DAST Demo Site</router-link>
         <nav class="flex gap-1">
-          <router-link to="/dashboard" class="px-3 py-1.5 rounded text-sm transition" :class="current==='dashboard'?'bg-white/20 text-white font-semibold':'text-indigo-200 hover:bg-white/10 hover:text-white'">ダッシュボード</router-link>
-          <router-link to="/customers" class="px-3 py-1.5 rounded text-sm transition" :class="current==='customers'?'bg-white/20 text-white font-semibold':'text-indigo-200 hover:bg-white/10 hover:text-white'">顧客</router-link>
-          <router-link to="/quotes" class="px-3 py-1.5 rounded text-sm transition" :class="current==='quotes'?'bg-white/20 text-white font-semibold':'text-indigo-200 hover:bg-white/10 hover:text-white'">見積</router-link>
-          <router-link to="/quotes/new" class="px-3 py-1.5 rounded text-sm transition" :class="current==='new'?'bg-white/20 text-white font-semibold':'text-indigo-200 hover:bg-white/10 hover:text-white'">+ 新規見積</router-link>
+          <router-link to="/dashboard" class="px-3 py-1.5 rounded text-sm" :class="current==='dashboard'?'bg-white/25 text-white font-semibold':'text-indigo-200 hover:bg-white/10 hover:text-white'">ダッシュボード</router-link>
+          <router-link to="/customers" class="px-3 py-1.5 rounded text-sm" :class="current==='customers'?'bg-white/25 text-white font-semibold':'text-indigo-200 hover:bg-white/10 hover:text-white'">顧客</router-link>
+          <router-link to="/quotes" class="px-3 py-1.5 rounded text-sm" :class="current==='quotes'?'bg-white/25 text-white font-semibold':'text-indigo-200 hover:bg-white/10 hover:text-white'">見積</router-link>
+          <router-link to="/quotes/new" class="px-3 py-1.5 rounded text-sm" :class="current==='new'?'bg-white/25 text-white font-semibold':'text-indigo-200 hover:bg-white/10 hover:text-white'">+ 新規見積</router-link>
         </nav>
       </div>
       <button @click="$emit('logout')" class="text-indigo-200 hover:text-white text-sm">ログアウト</button>
@@ -51,29 +57,32 @@ const AppHeader = {
   </header>`
 }
 
-/* ─────────── ログイン ─────────── */
+/* ═══════════════════════ LOGIN (夜空+グロー) ═══════════════════════ */
 const LoginPage = {
   template:`
-  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900">
-    <div class="w-full max-w-sm mx-4">
+  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950 relative overflow-hidden">
+    <div class="absolute inset-0 grid-pattern"></div>
+    <div class="absolute top-20 left-20 w-96 h-96 bg-indigo-500 rounded-full filter blur-3xl opacity-20"></div>
+    <div class="absolute bottom-20 right-20 w-96 h-96 bg-purple-500 rounded-full filter blur-3xl opacity-20"></div>
+    <div class="relative w-full max-w-sm mx-4">
       <div class="text-center mb-6">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-500 shadow-lg shadow-indigo-500/30 mb-3"><span class="text-3xl">📋</span></div>
-        <h1 class="text-2xl font-bold text-white">DAST Demo Site</h1>
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 glow mb-4"><span class="text-4xl">📋</span></div>
+        <h1 class="text-3xl font-black text-white">DAST Demo Site</h1>
         <p class="text-indigo-300 text-sm mt-1">見積システム</p>
       </div>
-      <div class="bg-white rounded-2xl p-8 shadow-2xl">
-        <h2 class="text-lg font-bold text-gray-800 mb-5">ログイン</h2>
+      <div class="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 shadow-2xl">
+        <h2 class="text-lg font-bold text-white mb-5">ログイン</h2>
         <form @submit.prevent="doLogin">
           <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-600 mb-1.5">メールアドレス</label>
-            <input v-model="email" type="text" placeholder="admin@3sec-demo.com" class="w-full px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:bg-white">
+            <label class="block text-xs font-medium text-indigo-200 mb-1.5">メールアドレス</label>
+            <input v-model="email" type="text" placeholder="admin@3sec-demo.com" class="w-full px-4 py-2.5 bg-white/10 border-2 border-white/20 rounded-lg text-sm text-white placeholder-indigo-300 focus:outline-none focus:border-indigo-400">
           </div>
           <div class="mb-5">
-            <label class="block text-sm font-medium text-gray-600 mb-1.5">パスワード</label>
-            <input v-model="password" type="password" placeholder="••••••••" class="w-full px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:bg-white">
+            <label class="block text-xs font-medium text-indigo-200 mb-1.5">パスワード</label>
+            <input v-model="password" type="password" placeholder="••••••••" class="w-full px-4 py-2.5 bg-white/10 border-2 border-white/20 rounded-lg text-sm text-white placeholder-indigo-300 focus:outline-none focus:border-indigo-400">
           </div>
-          <div v-if="error" class="mb-4 p-3 rounded-lg bg-red-50 border-2 border-red-200 text-red-600 text-sm" v-html="error"></div>
-          <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg text-sm shadow-lg shadow-indigo-500/25">ログイン</button>
+          <div v-if="error" class="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-400/40 text-red-200 text-sm" v-html="error"></div>
+          <button type="submit" class="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-bold py-3 rounded-lg text-sm shadow-lg shadow-indigo-500/40">ログイン</button>
         </form>
       </div>
     </div>
@@ -91,54 +100,75 @@ const LoginPage = {
   }
 }
 
-/* ─────────── ダッシュボード ─────────── */
+/* ═══════════════════════ DASHBOARD (青、KPI+棒グラフ) ═══════════════════════ */
 const DashboardPage = {
   components:{AppHeader},
   template:`
-  <div>
+  <div class="bg-slate-50 min-h-screen">
     <AppHeader current="dashboard" @logout="logout"/>
-    <div class="bg-gradient-to-r from-indigo-800 to-indigo-600 px-6 py-6">
+    <div class="bg-gradient-to-br from-indigo-800 via-indigo-700 to-blue-700 px-6 py-8">
       <div class="max-w-6xl mx-auto">
-        <h1 class="text-xl font-bold text-white">ダッシュボード</h1>
-        <p class="text-indigo-200 text-sm">{{user?.name||'ゲスト'}}さん、こんにちは</p>
+        <p class="text-indigo-200 text-xs uppercase tracking-widest">DASHBOARD</p>
+        <h1 class="text-3xl font-black text-white mt-1">ダッシュボード</h1>
+        <p class="text-indigo-200 text-sm mt-2">{{user?.name||'ゲスト'}}さん、こんにちは</p>
       </div>
     </div>
-    <main class="max-w-6xl mx-auto px-6 -mt-4">
+    <main class="max-w-6xl mx-auto px-6 -mt-6">
       <div class="grid grid-cols-4 gap-4 mb-6">
-        <div class="rounded-xl p-5 shadow-lg bg-gradient-to-br from-indigo-500 to-indigo-700 text-white">
-          <p class="text-xs font-bold text-indigo-100 uppercase mb-2">作成済み見積</p>
-          <p class="text-4xl font-black">{{stats.total}}</p>
+        <div class="rounded-2xl p-5 shadow-xl bg-white border border-gray-100">
+          <p class="text-xs font-bold text-gray-400 uppercase mb-2">📋 作成済み</p>
+          <p class="text-4xl font-black text-gray-800">{{stats.total}}</p>
+          <p class="text-xs text-gray-400 mt-1">件</p>
         </div>
-        <div class="rounded-xl p-5 shadow-lg bg-gradient-to-br from-blue-500 to-blue-700 text-white">
-          <p class="text-xs font-bold uppercase mb-2">送付済</p>
+        <div class="rounded-2xl p-5 shadow-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+          <p class="text-xs font-bold uppercase mb-2">📤 送付済</p>
           <p class="text-4xl font-black">{{stats.sent}}</p>
+          <p class="text-xs text-blue-100 mt-1">件</p>
         </div>
-        <div class="rounded-xl p-5 shadow-lg bg-gradient-to-br from-emerald-500 to-emerald-700 text-white">
-          <p class="text-xs font-bold uppercase mb-2">受注</p>
+        <div class="rounded-2xl p-5 shadow-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+          <p class="text-xs font-bold uppercase mb-2">✅ 受注</p>
           <p class="text-4xl font-black">{{stats.accepted}}</p>
+          <p class="text-xs text-emerald-100 mt-1">件</p>
         </div>
-        <div class="rounded-xl p-5 shadow-lg bg-gradient-to-br from-amber-500 to-amber-700 text-white">
-          <p class="text-xs font-bold uppercase mb-2">受注金額</p>
+        <div class="rounded-2xl p-5 shadow-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white">
+          <p class="text-xs font-bold uppercase mb-2">💰 受注額</p>
           <p class="text-2xl font-black">¥{{fmt(stats.acceptedTotal)}}</p>
+          <p class="text-xs text-amber-100 mt-1">YTD</p>
         </div>
       </div>
-      <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-        <div class="px-5 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-          <h3 class="text-sm font-bold text-gray-700">最近の見積</h3>
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="col-span-2 bg-white rounded-2xl p-6 shadow-xl border border-gray-100">
+          <h3 class="text-sm font-bold text-gray-700 mb-4">📊 ステータス別 件数</h3>
+          <div class="flex items-end gap-4 h-44">
+            <div v-for="s in ['draft','sent','accepted','rejected']" :key="s" class="flex-1 flex flex-col items-center gap-2">
+              <div class="text-xs font-bold text-gray-500">{{statusCount(s)}}</div>
+              <div class="bar w-full" :class="STATUS_COLOR[s]" :style="{height: (statusCount(s)/Math.max(stats.total,1)*100*1.4 || 6)+'%', minHeight:'8px'}"></div>
+              <span class="text-xs font-bold text-gray-600">{{STATUS_LABEL[s]}}</span>
+            </div>
+          </div>
+        </div>
+        <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 shadow-xl text-white">
+          <h3 class="text-sm font-bold mb-4">🎯 受注率</h3>
+          <p class="text-6xl font-black">{{Math.round(stats.accepted/Math.max(stats.total,1)*100)}}<span class="text-2xl">%</span></p>
+          <p class="text-xs text-slate-400 mt-2">対全見積</p>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+        <div class="px-6 py-4 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-gray-200 flex justify-between items-center">
+          <h3 class="text-sm font-bold text-gray-700">🕐 最近の見積</h3>
           <router-link to="/quotes" class="text-indigo-600 text-xs font-medium hover:underline">すべて →</router-link>
         </div>
         <table class="w-full text-sm">
-          <thead><tr class="bg-gray-800 text-white">
-            <th class="text-left px-4 py-2">チケット</th><th class="text-left px-4 py-2">顧客</th><th class="text-left px-4 py-2">タイトル</th><th class="text-right px-4 py-2">金額</th><th class="text-left px-4 py-2">状態</th><th></th>
+          <thead><tr class="bg-slate-700 text-white">
+            <th class="text-left px-4 py-2">チケット</th><th class="text-left px-4 py-2">顧客</th><th class="text-left px-4 py-2">タイトル</th><th class="text-right px-4 py-2">金額</th><th class="text-left px-4 py-2">状態</th>
           </tr></thead>
           <tbody>
-            <tr v-for="q in recentQuotes" :key="q.id" class="border-b border-gray-100 hover:bg-indigo-50">
-              <td class="px-4 py-2 font-mono text-indigo-700">{{q.ticket}}</td>
+            <tr v-for="q in recentQuotes" :key="q.id" class="border-b border-gray-100 hover:bg-indigo-50 cursor-pointer" @click="$router.push('/quotes/'+q.id)">
+              <td class="px-4 py-2 font-mono text-indigo-700 font-bold">{{q.ticket}}</td>
               <td class="px-4 py-2">{{q.customer_company}}</td>
               <td class="px-4 py-2">{{q.title}}</td>
               <td class="px-4 py-2 text-right font-mono">¥{{fmt(q.total)}}</td>
               <td class="px-4 py-2"><span class="px-2 py-1 rounded text-xs font-bold text-white" :class="STATUS_COLOR[q.status]">{{STATUS_LABEL[q.status]}}</span></td>
-              <td class="px-4 py-2"><router-link :to="'/quotes/'+q.id" class="text-indigo-600 text-xs underline">詳細</router-link></td>
             </tr>
           </tbody>
         </table>
@@ -148,52 +178,55 @@ const DashboardPage = {
   setup(){
     const user=ref(JSON.parse(localStorage.getItem('user')||'null'))
     const quotes=ref([])
-    const stats=reactive({total:0, sent:0, accepted:0, acceptedTotal:0})
+    const stats=reactive({total:0,sent:0,accepted:0,acceptedTotal:0,draft:0,rejected:0})
     const recentQuotes=computed(()=>quotes.value.slice(0,6))
+    const statusCount=(s)=>quotes.value.filter(q=>q.status===s).length
     onMounted(async()=>{
       const res=await fetch('/api/quotes'); const j=await res.json()
       quotes.value=j.quotes||[]
       stats.total=quotes.value.length
-      stats.sent=quotes.value.filter(q=>q.status==='sent').length
-      stats.accepted=quotes.value.filter(q=>q.status==='accepted').length
+      stats.sent=statusCount('sent'); stats.accepted=statusCount('accepted')
+      stats.draft=statusCount('draft'); stats.rejected=statusCount('rejected')
       stats.acceptedTotal=quotes.value.filter(q=>q.status==='accepted').reduce((s,q)=>s+(q.total||0),0)
     })
     function logout(){localStorage.removeItem('user');window.location.href='/'}
-    return {user,quotes,stats,recentQuotes,logout,fmt,STATUS_LABEL,STATUS_COLOR}
+    return {user,quotes,stats,recentQuotes,statusCount,logout,fmt,STATUS_LABEL,STATUS_COLOR}
   }
 }
 
-/* ─────────── 顧客一覧 ─────────── */
+/* ═══════════════════════ CUSTOMERS LIST (緑、テーブル) ═══════════════════════ */
 const CustomersPage = {
   components:{AppHeader},
   template:`
-  <div>
+  <div class="bg-emerald-50 min-h-screen">
     <AppHeader current="customers" @logout="logout"/>
-    <div class="bg-gradient-to-r from-emerald-700 to-teal-600 px-6 py-6">
+    <div class="bg-gradient-to-r from-emerald-700 via-teal-600 to-emerald-700 px-6 py-8">
       <div class="max-w-6xl mx-auto">
-        <h1 class="text-xl font-bold text-white">顧客一覧</h1>
-        <p class="text-emerald-200 text-sm">取引先 顧客マスタ</p>
+        <p class="text-emerald-200 text-xs uppercase tracking-widest">CUSTOMERS</p>
+        <h1 class="text-3xl font-black text-white mt-1">顧客一覧 🏢</h1>
+        <p class="text-emerald-200 text-sm mt-2">{{customers.length}}件の取引先</p>
       </div>
     </div>
-    <main class="max-w-6xl mx-auto px-6 -mt-4">
-      <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-        <div class="px-5 py-4 bg-emerald-50 border-b-2 border-emerald-200 flex items-center gap-3">
-          <input v-model="search" @keyup.enter="doSearch" type="text" placeholder="会社名 / 担当者名" class="flex-1 px-4 py-2.5 bg-white border-2 border-emerald-300 rounded-lg text-sm">
-          <button @click="doSearch" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold">検索</button>
+    <main class="max-w-6xl mx-auto px-6 -mt-6">
+      <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-emerald-100">
+        <div class="px-5 py-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-b-2 border-emerald-300 flex items-center gap-3">
+          <input v-model="search" @keyup.enter="doSearch" type="text" placeholder="🔍 会社名 / 担当者名" class="flex-1 px-4 py-2.5 bg-white border-2 border-emerald-300 rounded-lg text-sm focus:outline-none focus:border-emerald-500">
+          <button @click="doSearch" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold">検索</button>
         </div>
+        <div v-if="errorHtml" class="m-4 p-3 bg-red-50 border-2 border-red-200 text-red-700 rounded" v-html="errorHtml"></div>
         <table class="w-full text-sm">
-          <thead><tr class="bg-gray-800 text-white">
+          <thead><tr class="bg-emerald-800 text-white">
             <th class="text-left px-4 py-3">ID</th><th class="text-left px-4 py-3">会社名</th><th class="text-left px-4 py-3">業種</th><th class="text-left px-4 py-3">担当者</th><th class="text-left px-4 py-3">メール</th><th class="text-right px-4 py-3">売上規模</th><th></th>
           </tr></thead>
           <tbody>
-            <tr v-for="c in customers" :key="c.id" class="border-b border-gray-100 hover:bg-emerald-50">
-              <td class="px-4 py-3 font-mono">{{c.id}}</td>
-              <td class="px-4 py-3 font-bold">{{c.company}}</td>
-              <td class="px-4 py-3">{{c.industry}}</td>
+            <tr v-for="c in customers" :key="c.id" class="border-b border-emerald-100 hover:bg-emerald-50">
+              <td class="px-4 py-3 font-mono text-gray-500">{{c.id}}</td>
+              <td class="px-4 py-3 font-bold text-emerald-900">{{c.company}}</td>
+              <td class="px-4 py-3"><span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-bold">{{c.industry}}</span></td>
               <td class="px-4 py-3">{{c.name}}</td>
               <td class="px-4 py-3 text-gray-600">{{c.email}}</td>
               <td class="px-4 py-3 text-right font-mono">¥{{fmt(c.annual_revenue)}}</td>
-              <td class="px-4 py-3"><router-link :to="'/customers/'+c.id" class="text-emerald-700 text-xs underline">詳細 →</router-link></td>
+              <td class="px-4 py-3"><router-link :to="'/customers/'+c.id" class="text-emerald-700 text-xs font-bold underline">詳細 →</router-link></td>
             </tr>
           </tbody>
         </table>
@@ -201,59 +234,87 @@ const CustomersPage = {
     </main>
   </div>`,
   setup(){
-    const search=ref(''), customers=ref([])
+    const search=ref(''), customers=ref([]), errorHtml=ref('')
     async function doSearch(){
+      errorHtml.value=''
       const url='/api/customers'+(search.value?'?q='+encodeURIComponent(search.value):'')
       const res=await fetch(url); const j=await res.json()
-      customers.value=j.customers||[]
+      if(j.error){errorHtml.value=j.error+'<br><code>'+j.sql+'</code>'; customers.value=[]}
+      else{customers.value=j.customers||[]}
     }
     onMounted(doSearch)
     function logout(){localStorage.removeItem('user');window.location.href='/'}
-    return {search,customers,doSearch,logout,fmt}
+    return {search,customers,errorHtml,doSearch,logout,fmt}
   }
 }
 
-/* ─────────── 顧客詳細 (IDOR) ─────────── */
+/* ═══════════════════════ CUSTOMER DETAIL (シアン、サイドカード) ═══════════════════════ */
 const CustomerDetailPage = {
   components:{AppHeader},
   template:`
-  <div>
+  <div class="bg-cyan-50 min-h-screen">
     <AppHeader current="customers" @logout="logout"/>
-    <div class="bg-gradient-to-r from-emerald-700 to-teal-600 px-6 py-6">
+    <div class="bg-gradient-to-br from-cyan-700 via-sky-600 to-cyan-800 px-6 py-8">
       <div class="max-w-5xl mx-auto">
-        <div class="text-sm text-emerald-200 mb-1">
+        <div class="text-xs text-cyan-200 mb-1">
           <router-link to="/customers" class="hover:text-white">顧客一覧</router-link>
-          <span class="mx-2">/</span><span class="text-white">{{customer?.company || '読込中'}}</span>
+          <span class="mx-2">›</span><span class="text-white">{{customer?.company || '...'}}</span>
         </div>
-        <h1 class="text-xl font-bold text-white">{{customer?.company || '...'}}</h1>
+        <h1 class="text-3xl font-black text-white mt-1">{{customer?.company || '...'}}</h1>
+        <p class="text-cyan-200 text-sm mt-1">{{customer?.industry || ''}}</p>
       </div>
     </div>
-    <main class="max-w-5xl mx-auto px-6 -mt-4" v-if="customer">
-      <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200 mb-5">
-        <h3 class="font-bold text-gray-800 mb-3">顧客基本情報</h3>
-        <table class="w-full text-sm">
-          <tr class="border-b"><th class="text-left py-2 text-gray-600 w-32">ID</th><td class="py-2 font-mono">{{customer.id}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">会社名</th><td class="py-2 font-bold">{{customer.company}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">業種</th><td class="py-2">{{customer.industry}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">主担当</th><td class="py-2">{{customer.name}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">メール</th><td class="py-2">{{customer.email}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">電話</th><td class="py-2">{{customer.phone}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">住所</th><td class="py-2">{{customer.address}}</td></tr>
-          <tr><th class="text-left py-2 text-gray-600">売上規模</th><td class="py-2 font-mono">¥{{fmt(customer.annual_revenue)}}</td></tr>
-        </table>
-      </div>
-      <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-        <h3 class="font-bold text-gray-800 mb-3">担当者一覧 ({{contacts.length}})</h3>
-        <table class="w-full text-sm">
-          <thead><tr class="bg-gray-100">
-            <th class="text-left px-3 py-2">氏名</th><th class="text-left px-3 py-2">役職</th><th class="text-left px-3 py-2">メール</th><th class="text-left px-3 py-2">電話</th>
-          </tr></thead>
-          <tbody>
-            <tr v-for="ct in contacts" :key="ct.id" class="border-b">
-              <td class="px-3 py-2">{{ct.name}}</td><td class="px-3 py-2">{{ct.role}}</td><td class="px-3 py-2">{{ct.email}}</td><td class="px-3 py-2">{{ct.phone}}</td>
-            </tr>
-          </tbody>
-        </table>
+    <main class="max-w-5xl mx-auto px-6 -mt-6" v-if="customer">
+      <div class="grid grid-cols-3 gap-5">
+        <div class="bg-white rounded-2xl shadow-xl p-6 border border-cyan-100">
+          <div class="text-center mb-4">
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-500 to-sky-600 text-white text-3xl font-black shadow-lg">{{customer.company[0]}}</div>
+            <h2 class="font-bold text-lg mt-3">{{customer.company}}</h2>
+            <p class="text-xs text-gray-500">ID: {{customer.id}}</p>
+          </div>
+          <div class="border-t pt-3 space-y-1.5 text-sm">
+            <p><span class="text-gray-400">💼</span> {{customer.industry}}</p>
+            <p><span class="text-gray-400">👤</span> {{customer.name}}</p>
+            <p><span class="text-gray-400">✉️</span> <span class="text-cyan-700">{{customer.email}}</span></p>
+            <p><span class="text-gray-400">📞</span> {{customer.phone}}</p>
+            <p><span class="text-gray-400">📍</span> {{customer.address}}</p>
+          </div>
+          <div class="mt-4 pt-3 border-t">
+            <p class="text-xs text-gray-500 mb-1">売上規模</p>
+            <p class="text-2xl font-black text-cyan-700">¥{{fmt(customer.annual_revenue)}}</p>
+          </div>
+        </div>
+        <div class="col-span-2 space-y-5">
+          <div class="bg-gradient-to-br from-orange-100 to-amber-100 rounded-2xl shadow-xl p-6 border border-orange-200">
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="font-bold text-orange-900">👥 担当者 ({{contacts.length}})</h3>
+              <router-link :to="'/customers/'+customer.id+'/contacts'" class="text-orange-700 text-xs font-bold underline">詳細を見る →</router-link>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+              <router-link v-for="(ct,idx) in contacts.slice(0,6)" :key="ct.id" :to="'/customers/'+customer.id+'/contacts/'+ct.id" class="bg-white rounded-lg p-3 hover:shadow-md">
+                <div class="flex items-center gap-2">
+                  <div class="w-9 h-9 rounded-full text-white font-bold flex items-center justify-center text-sm" :class="AVATAR_COLORS[idx%AVATAR_COLORS.length]">{{ct.name[0]}}</div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs font-bold truncate">{{ct.name}}</p>
+                    <p class="text-xs text-gray-500 truncate">{{ct.role}}</p>
+                  </div>
+                </div>
+              </router-link>
+            </div>
+          </div>
+          <div class="bg-white rounded-2xl shadow-xl p-6 border border-cyan-100">
+            <h3 class="font-bold text-cyan-900 mb-3">📊 関連見積</h3>
+            <table class="w-full text-sm">
+              <tr v-for="q in relatedQuotes" :key="q.id" class="border-b">
+                <td class="py-2 font-mono text-violet-700 font-bold">{{q.ticket}}</td>
+                <td class="py-2">{{q.title}}</td>
+                <td class="py-2 text-right font-mono">¥{{fmt(q.total)}}</td>
+                <td class="py-2"><span class="px-2 py-0.5 rounded text-xs text-white" :class="STATUS_COLOR[q.status]">{{STATUS_LABEL[q.status]}}</span></td>
+              </tr>
+              <tr v-if="!relatedQuotes.length"><td colspan="4" class="py-4 text-center text-gray-400">関連見積なし</td></tr>
+            </table>
+          </div>
+        </div>
       </div>
     </main>
     <main v-else-if="error" class="max-w-3xl mx-auto px-6 mt-8">
@@ -262,51 +323,180 @@ const CustomerDetailPage = {
   </div>`,
   setup(){
     const route=useRoute()
-    const customer=ref(null), contacts=ref([]), error=ref('')
+    const customer=ref(null), contacts=ref([]), relatedQuotes=ref([]), error=ref('')
     async function load(){
-      error.value=''; customer.value=null; contacts.value=[]
-      const res=await fetch('/api/customers/'+route.params.id)
+      error.value=''; customer.value=null
+      const res=await fetch('/api/customers/'+route.params.cid)
       const j=await res.json()
       if(j.error){error.value=j.error+(j.sql?'<br><code>'+j.sql+'</code>':'')}
-      else{customer.value=j.customer; contacts.value=j.contacts||[]}
+      else{customer.value=j.customer; contacts.value=j.contacts||[]
+        const qres=await fetch('/api/quotes'); const qj=await qres.json()
+        relatedQuotes.value=(qj.quotes||[]).filter(q=>q.customer_id==route.params.cid).slice(0,5)
+      }
     }
-    onMounted(load); watch(()=>route.params.id, load)
+    onMounted(load); watch(()=>route.params.cid, load)
     function logout(){localStorage.removeItem('user');window.location.href='/'}
-    return {customer,contacts,error,logout,fmt}
+    return {customer,contacts,relatedQuotes,error,logout,fmt,STATUS_LABEL,STATUS_COLOR,AVATAR_COLORS}
   }
 }
 
-/* ─────────── 見積一覧 ─────────── */
+/* ═══════════════════════ CONTACTS LIST (オレンジ、アバターグリッド) ═══════════════════════ */
+const CustomerContactsPage = {
+  components:{AppHeader},
+  template:`
+  <div class="bg-orange-50 min-h-screen">
+    <AppHeader current="customers" @logout="logout"/>
+    <div class="bg-gradient-to-r from-orange-600 via-amber-500 to-orange-600 px-6 py-8">
+      <div class="max-w-5xl mx-auto">
+        <div class="text-xs text-orange-100 mb-1">
+          <router-link to="/customers" class="hover:text-white">顧客</router-link>
+          <span class="mx-2">›</span>
+          <router-link :to="'/customers/'+route.params.cid" class="hover:text-white">{{customer?.company||'...'}}</router-link>
+          <span class="mx-2">›</span><span class="text-white">担当者</span>
+        </div>
+        <h1 class="text-3xl font-black text-white mt-1">👥 担当者一覧</h1>
+        <p class="text-orange-100 text-sm mt-1">{{customer?.company||''}} の連絡先</p>
+      </div>
+    </div>
+    <main class="max-w-5xl mx-auto px-6 -mt-6">
+      <div class="grid grid-cols-3 gap-5">
+        <router-link v-for="(ct,idx) in contacts" :key="ct.id" :to="'/customers/'+route.params.cid+'/contacts/'+ct.id" class="bg-white rounded-2xl shadow-xl p-6 hover:shadow-2xl transition border border-orange-100 group">
+          <div class="flex items-start gap-4">
+            <div class="w-16 h-16 rounded-2xl text-white font-black flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition" :class="AVATAR_COLORS[idx%AVATAR_COLORS.length]">{{ct.name[0]}}</div>
+            <div class="flex-1 min-w-0">
+              <p class="font-bold text-lg text-gray-800">{{ct.name}}</p>
+              <p class="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded inline-block mt-1">{{ct.role}}</p>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t space-y-1.5 text-xs">
+            <p class="text-gray-600">✉️ <span class="text-orange-700">{{ct.email}}</span></p>
+            <p class="text-gray-600">📞 {{ct.phone}}</p>
+          </div>
+        </router-link>
+        <div v-if="!contacts.length" class="col-span-3 text-center py-10 text-gray-400 bg-white rounded-2xl shadow">担当者がいません</div>
+      </div>
+    </main>
+  </div>`,
+  setup(){
+    const route=useRoute()
+    const contacts=ref([]), customer=ref(null)
+    async function load(){
+      const res=await fetch('/api/customers/'+route.params.cid+'/contacts')
+      const j=await res.json()
+      customer.value=j.customer; contacts.value=j.contacts||[]
+    }
+    onMounted(load); watch(()=>route.params.cid, load)
+    function logout(){localStorage.removeItem('user');window.location.href='/'}
+    return {route,contacts,customer,logout,AVATAR_COLORS}
+  }
+}
+
+/* ═══════════════════════ CONTACT DETAIL (パープル、プロフィール) ═══════════════════════ */
+const ContactDetailPage = {
+  components:{AppHeader},
+  template:`
+  <div class="bg-gradient-to-br from-purple-50 to-pink-50 min-h-screen">
+    <AppHeader current="customers" @logout="logout"/>
+    <div class="bg-gradient-to-br from-purple-800 via-fuchsia-700 to-pink-700 px-6 py-8">
+      <div class="max-w-4xl mx-auto">
+        <div class="text-xs text-purple-200 mb-1">
+          <router-link to="/customers" class="hover:text-white">顧客</router-link>
+          <span class="mx-2">›</span>
+          <router-link :to="'/customers/'+route.params.cid" class="hover:text-white">{{contact?.customer_company||'...'}}</router-link>
+          <span class="mx-2">›</span>
+          <router-link :to="'/customers/'+route.params.cid+'/contacts'" class="hover:text-white">担当者</router-link>
+          <span class="mx-2">›</span><span class="text-white">{{contact?.name||'...'}}</span>
+        </div>
+      </div>
+    </div>
+    <main class="max-w-4xl mx-auto px-6 -mt-12" v-if="contact">
+      <div class="bg-white rounded-3xl shadow-2xl overflow-hidden">
+        <div class="bg-gradient-to-r from-purple-600 to-pink-600 px-8 py-12 text-center">
+          <div class="inline-flex items-center justify-center w-32 h-32 rounded-full bg-white text-purple-700 text-6xl font-black shadow-2xl">{{contact.name[0]}}</div>
+          <h1 class="text-3xl font-black text-white mt-4">{{contact.name}}</h1>
+          <p class="text-purple-200 text-sm mt-1">{{contact.role}} @ {{contact.customer_company}}</p>
+        </div>
+        <div class="p-8">
+          <div class="grid grid-cols-2 gap-5">
+            <div class="bg-purple-50 rounded-2xl p-5 border-l-4 border-purple-500">
+              <p class="text-xs font-bold text-purple-600 uppercase mb-1">✉️ メール</p>
+              <p class="text-lg font-bold text-purple-900 break-all">{{contact.email}}</p>
+            </div>
+            <div class="bg-pink-50 rounded-2xl p-5 border-l-4 border-pink-500">
+              <p class="text-xs font-bold text-pink-600 uppercase mb-1">📞 電話</p>
+              <p class="text-lg font-bold text-pink-900">{{contact.phone}}</p>
+            </div>
+            <div class="bg-fuchsia-50 rounded-2xl p-5 border-l-4 border-fuchsia-500">
+              <p class="text-xs font-bold text-fuchsia-600 uppercase mb-1">🏢 所属</p>
+              <p class="text-lg font-bold text-fuchsia-900">{{contact.customer_company}}</p>
+            </div>
+            <div class="bg-violet-50 rounded-2xl p-5 border-l-4 border-violet-500">
+              <p class="text-xs font-bold text-violet-600 uppercase mb-1">👔 役職</p>
+              <p class="text-lg font-bold text-violet-900">{{contact.role}}</p>
+            </div>
+          </div>
+          <div class="mt-6 pt-6 border-t flex gap-3">
+            <router-link :to="'/customers/'+route.params.cid+'/contacts'" class="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-bold text-sm">← 担当者一覧</router-link>
+            <router-link :to="'/customers/'+route.params.cid" class="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-bold text-sm">顧客詳細を開く</router-link>
+          </div>
+        </div>
+      </div>
+    </main>
+    <main v-else-if="error" class="max-w-3xl mx-auto px-6 mt-8">
+      <div class="bg-red-50 border-2 border-red-200 p-4 rounded text-red-700" v-html="error"></div>
+    </main>
+  </div>`,
+  setup(){
+    const route=useRoute()
+    const contact=ref(null), error=ref('')
+    async function load(){
+      error.value=''; contact.value=null
+      const res=await fetch('/api/contacts/'+route.params.contact_id)
+      const j=await res.json()
+      if(j.error){error.value=j.error+(j.sql?'<br><code>'+j.sql+'</code>':'')}
+      else{contact.value=j.contact}
+    }
+    onMounted(load); watch(()=>route.params.contact_id, load)
+    function logout(){localStorage.removeItem('user');window.location.href='/'}
+    return {route,contact,error,logout}
+  }
+}
+
+/* ═══════════════════════ QUOTES LIST (紫、ストライプ) ═══════════════════════ */
 const QuotesPage = {
   components:{AppHeader},
   template:`
-  <div>
+  <div class="bg-violet-50 min-h-screen">
     <AppHeader current="quotes" @logout="logout"/>
-    <div class="bg-gradient-to-r from-violet-700 to-purple-600 px-6 py-6">
+    <div class="bg-gradient-to-r from-violet-800 via-purple-700 to-violet-800 px-6 py-8">
       <div class="max-w-6xl mx-auto flex justify-between items-center">
-        <div><h1 class="text-xl font-bold text-white">見積一覧</h1><p class="text-violet-200 text-sm">作成済みの見積</p></div>
-        <router-link to="/quotes/new" class="px-4 py-2 bg-white text-violet-700 rounded-lg font-bold text-sm">+ 新規作成</router-link>
+        <div>
+          <p class="text-violet-200 text-xs uppercase tracking-widest">QUOTES</p>
+          <h1 class="text-3xl font-black text-white mt-1">📋 見積一覧</h1>
+          <p class="text-violet-200 text-sm mt-1">{{quotes.length}}件</p>
+        </div>
+        <router-link to="/quotes/new" class="px-5 py-3 bg-white text-violet-700 rounded-xl font-black shadow-xl hover:shadow-2xl">+ 新規作成</router-link>
       </div>
     </div>
-    <main class="max-w-6xl mx-auto px-6 -mt-4">
-      <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+    <main class="max-w-6xl mx-auto px-6 -mt-6">
+      <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-violet-100">
         <table class="w-full text-sm">
-          <thead><tr class="bg-gray-800 text-white">
-            <th class="text-left px-4 py-3">チケット</th><th class="text-left px-4 py-3">顧客</th><th class="text-left px-4 py-3">タイトル</th><th class="text-right px-4 py-3">小計</th><th class="text-right px-4 py-3">消費税</th><th class="text-right px-4 py-3">合計</th><th class="text-left px-4 py-3">状態</th><th class="text-left px-4 py-3">期日</th><th></th>
+          <thead><tr class="bg-violet-800 text-white">
+            <th class="text-left px-4 py-3">チケット</th><th class="text-left px-4 py-3">顧客</th><th class="text-left px-4 py-3">タイトル</th><th class="text-right px-4 py-3">小計</th><th class="text-right px-4 py-3">税</th><th class="text-right px-4 py-3">合計</th><th class="text-left px-4 py-3">状態</th><th class="text-left px-4 py-3">期日</th><th></th>
           </tr></thead>
           <tbody>
-            <tr v-for="q in quotes" :key="q.id" class="border-b hover:bg-violet-50">
+            <tr v-for="(q,i) in quotes" :key="q.id" :class="i%2?'bg-violet-50':'bg-white'" class="border-b border-violet-100 hover:bg-violet-100">
               <td class="px-4 py-3 font-mono text-violet-700 font-bold">{{q.ticket}}</td>
               <td class="px-4 py-3">{{q.customer_company}}</td>
               <td class="px-4 py-3">{{q.title}}</td>
               <td class="px-4 py-3 text-right font-mono">¥{{fmt(q.total)}}</td>
-              <td class="px-4 py-3 text-right font-mono text-gray-500">¥{{fmt(q.tax)}}</td>
+              <td class="px-4 py-3 text-right font-mono text-gray-500 text-xs">¥{{fmt(q.tax)}}</td>
               <td class="px-4 py-3 text-right font-mono font-bold">¥{{fmt(q.total+q.tax)}}</td>
               <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-bold text-white" :class="STATUS_COLOR[q.status]">{{STATUS_LABEL[q.status]}}</span></td>
               <td class="px-4 py-3 text-xs text-gray-500">{{q.valid_until}}</td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <router-link :to="'/quotes/'+q.id" class="text-violet-700 text-xs underline mr-3">詳細</router-link>
-                <button @click="deleteQuote(q)" class="text-red-600 text-xs underline hover:text-red-800">削除</button>
+                <button @click="deleteQuote(q)" class="text-red-600 text-xs underline">削除</button>
               </td>
             </tr>
           </tbody>
@@ -316,12 +506,11 @@ const QuotesPage = {
   </div>`,
   setup(){
     const quotes=ref([])
-    async function load(){const res=await fetch('/api/quotes'); const j=await res.json(); quotes.value=j.quotes||[]}
+    async function load(){const r=await fetch('/api/quotes'); const j=await r.json(); quotes.value=j.quotes||[]}
     async function deleteQuote(q){
-      if(!confirm(`見積 ${q.ticket}（${q.customer_company} / ${q.title}）を削除しますか？\nこの操作は取り消せません。`)) return
-      const res=await fetch('/api/quotes/'+q.id, {method:'DELETE'})
-      const j=await res.json()
-      if(j.success){ await load() } else { alert('削除失敗: '+(j.error||'unknown')) }
+      if(!confirm(`見積 ${q.ticket} を削除しますか？`)) return
+      const r=await fetch('/api/quotes/'+q.id,{method:'DELETE'}); const j=await r.json()
+      if(j.success) load(); else alert('削除失敗')
     }
     onMounted(load)
     function logout(){localStorage.removeItem('user');window.location.href='/'}
@@ -329,61 +518,60 @@ const QuotesPage = {
   }
 }
 
-/* ─────────── 見積詳細 + PDF (Path Traversal) ─────────── */
+/* ═══════════════════════ QUOTE DETAIL (伝票風、白＋アンバー) ═══════════════════════ */
 const QuoteDetailPage = {
   components:{AppHeader},
   template:`
-  <div>
+  <div class="bg-stone-100 min-h-screen">
     <AppHeader current="quotes" @logout="logout"/>
-    <div class="bg-gradient-to-r from-violet-700 to-purple-600 px-6 py-6">
-      <div class="max-w-5xl mx-auto">
-        <div class="text-sm text-violet-200 mb-1">
-          <router-link to="/quotes" class="hover:text-white">見積一覧</router-link>
-          <span class="mx-2">/</span><span class="text-white">{{quote?.ticket||'読込中'}}</span>
-        </div>
-        <h1 class="text-xl font-bold text-white">{{quote?.title||'...'}}</h1>
+    <div class="bg-stone-800 px-6 py-4">
+      <div class="max-w-4xl mx-auto text-xs text-stone-300">
+        <router-link to="/quotes" class="hover:text-white">見積一覧</router-link>
+        <span class="mx-2">›</span><span class="text-white">{{quote?.ticket||'...'}}</span>
       </div>
     </div>
-    <main class="max-w-5xl mx-auto px-6 -mt-4" v-if="quote">
-      <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200 mb-5">
-        <div class="flex justify-between items-start mb-4">
+    <main class="max-w-4xl mx-auto px-6 py-8" v-if="quote">
+      <div class="bg-white shadow-2xl rounded-lg overflow-hidden">
+        <div class="ticket-stub px-8 py-6 border-b-4 border-dashed border-amber-300 flex justify-between items-center">
           <div>
-            <p class="text-xs text-gray-500">チケット番号</p>
-            <p class="text-2xl font-bold text-violet-700 font-mono">{{quote.ticket}}</p>
+            <p class="text-xs font-bold text-amber-700 uppercase tracking-wider">御 見 積 書</p>
+            <h1 class="text-2xl font-black text-stone-800 mt-1">{{quote.title}}</h1>
           </div>
-          <span class="px-3 py-1 rounded text-sm font-bold text-white" :class="STATUS_COLOR[quote.status]">{{STATUS_LABEL[quote.status]}}</span>
+          <div class="text-right">
+            <p class="text-xs text-amber-700">CHECKET No.</p>
+            <p class="text-3xl font-black font-mono text-amber-900">{{quote.ticket}}</p>
+            <span class="px-3 py-1 rounded mt-2 text-xs font-bold text-white inline-block" :class="STATUS_COLOR[quote.status]">{{STATUS_LABEL[quote.status]}}</span>
+          </div>
         </div>
-        <table class="w-full text-sm">
-          <tr class="border-b"><th class="text-left py-2 text-gray-600 w-32">顧客</th><td class="py-2 font-bold">{{quote.customer_company}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">担当</th><td class="py-2">{{quote.customer_name}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">タイトル</th><td class="py-2">{{quote.title}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">小計</th><td class="py-2 font-mono">¥{{fmt(quote.total)}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">消費税</th><td class="py-2 font-mono">¥{{fmt(quote.tax)}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">合計</th><td class="py-2 font-mono font-bold text-lg">¥{{fmt(quote.total+quote.tax)}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">有効期限</th><td class="py-2">{{quote.valid_until}}</td></tr>
-          <tr><th class="text-left py-2 text-gray-600 align-top">備考</th><td class="py-2 whitespace-pre-wrap">{{quote.notes}}</td></tr>
-        </table>
-        <div class="mt-5 flex gap-3">
-          <a :href="'/quotes/'+quote.id+'/pdf?file=quote_'+quote.ticket+'.pdf'" target="_blank" class="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-bold">📄 PDFダウンロード</a>
-          <button @click="deleteQuote" class="ml-auto px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700">🗑 削除</button>
+        <div class="p-8">
+          <div class="grid grid-cols-2 gap-8 mb-6">
+            <div>
+              <p class="text-xs text-stone-500 uppercase mb-2">お客様</p>
+              <p class="text-lg font-bold text-stone-800">{{quote.customer_company}}</p>
+              <p class="text-sm text-stone-600">{{quote.customer_name}} 様</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-stone-500">作成日</p>
+              <p class="text-sm font-mono">{{quote.created_at}}</p>
+              <p class="text-xs text-stone-500 mt-2">有効期限</p>
+              <p class="text-sm font-mono font-bold">{{quote.valid_until}}</p>
+            </div>
+          </div>
+          <div class="bg-stone-50 rounded-xl p-5 mb-5">
+            <div class="flex justify-between text-sm py-1"><span>小計</span><span class="font-mono">¥{{fmt(quote.total)}}</span></div>
+            <div class="flex justify-between text-sm py-1 text-stone-500"><span>消費税(10%)</span><span class="font-mono">¥{{fmt(quote.tax)}}</span></div>
+            <div class="border-t border-stone-300 mt-2 pt-2 flex justify-between"><span class="font-bold">合計金額</span><span class="font-mono font-black text-2xl text-amber-700">¥{{fmt(quote.total+quote.tax)}}</span></div>
+          </div>
+          <div class="mb-5">
+            <p class="text-xs text-stone-500 uppercase mb-2">備考</p>
+            <p class="text-sm whitespace-pre-wrap">{{quote.notes||'(なし)'}}</p>
+          </div>
+          <div class="flex gap-3">
+            <router-link :to="'/quotes/'+quote.id+'/items'" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-bold text-sm">📦 明細を見る ({{items.length}})</router-link>
+            <a :href="'/quotes/'+quote.id+'/pdf?file=quote_'+quote.ticket+'.pdf'" target="_blank" class="px-5 py-2.5 bg-amber-600 text-white rounded-lg font-bold text-sm">📄 PDF</a>
+            <button @click="deleteQuote" class="ml-auto px-5 py-2.5 bg-red-600 text-white rounded-lg font-bold text-sm">🗑 削除</button>
+          </div>
         </div>
-      </div>
-      <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-        <h3 class="font-bold text-gray-800 mb-3">明細 ({{items.length}})</h3>
-        <table class="w-full text-sm">
-          <thead><tr class="bg-gray-100">
-            <th class="text-left px-3 py-2">品目</th><th class="text-left px-3 py-2">摘要</th><th class="text-right px-3 py-2">数量</th><th class="text-right px-3 py-2">単価</th><th class="text-right px-3 py-2">小計</th>
-          </tr></thead>
-          <tbody>
-            <tr v-for="it in items" :key="it.id" class="border-b">
-              <td class="px-3 py-2 font-bold">{{it.product_name}}</td>
-              <td class="px-3 py-2 text-gray-600">{{it.description}}</td>
-              <td class="px-3 py-2 text-right font-mono">{{it.qty}}</td>
-              <td class="px-3 py-2 text-right font-mono">¥{{fmt(it.unit_price)}}</td>
-              <td class="px-3 py-2 text-right font-mono font-bold">¥{{fmt(it.subtotal)}}</td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </main>
     <main v-else-if="error" class="max-w-3xl mx-auto px-6 mt-8">
@@ -391,71 +579,124 @@ const QuoteDetailPage = {
     </main>
   </div>`,
   setup(){
-    const route=useRoute()
+    const route=useRoute(); const router=useRouter()
     const quote=ref(null), items=ref([]), error=ref('')
     async function load(){
       error.value=''; quote.value=null
-      const res=await fetch('/api/quotes/'+route.params.id)
+      const res=await fetch('/api/quotes/'+route.params.qid)
       const j=await res.json()
       if(j.error){error.value=j.error+(j.sql?'<br><code>'+j.sql+'</code>':'')}
       else{quote.value=j.quote; items.value=j.items||[]}
     }
-    onMounted(load); watch(()=>route.params.id, load)
-    const router=useRouter()
+    onMounted(load); watch(()=>route.params.qid, load)
     async function deleteQuote(){
       if(!quote.value) return
-      if(!confirm(`見積 ${quote.value.ticket}（${quote.value.customer_company} / ${quote.value.title}）を削除しますか？\nこの操作は取り消せません。`)) return
-      const res=await fetch('/api/quotes/'+quote.value.id, {method:'DELETE'})
-      const j=await res.json()
-      if(j.success){ router.push('/quotes') } else { alert('削除失敗: '+(j.error||'unknown')) }
+      if(!confirm(`見積 ${quote.value.ticket} を削除しますか？`)) return
+      const r=await fetch('/api/quotes/'+quote.value.id,{method:'DELETE'}); const j=await r.json()
+      if(j.success) router.push('/quotes'); else alert('削除失敗')
     }
     function logout(){localStorage.removeItem('user');window.location.href='/'}
     return {quote,items,error,deleteQuote,logout,fmt,STATUS_LABEL,STATUS_COLOR}
   }
 }
 
-/* ─────────── 新規見積 (フォーム) ─────────── */
+/* ═══════════════════════ QUOTE ITEMS (エメラルド、商品カード) ═══════════════════════ */
+const QuoteItemsPage = {
+  components:{AppHeader},
+  template:`
+  <div class="bg-emerald-50 min-h-screen">
+    <AppHeader current="quotes" @logout="logout"/>
+    <div class="bg-gradient-to-r from-emerald-700 to-teal-700 px-6 py-8">
+      <div class="max-w-5xl mx-auto">
+        <div class="text-xs text-emerald-200 mb-1">
+          <router-link to="/quotes" class="hover:text-white">見積</router-link>
+          <span class="mx-2">›</span>
+          <router-link :to="'/quotes/'+route.params.qid" class="hover:text-white">{{quote?.ticket||'...'}}</router-link>
+          <span class="mx-2">›</span><span class="text-white">明細</span>
+        </div>
+        <h1 class="text-3xl font-black text-white mt-1">📦 見積明細</h1>
+        <p class="text-emerald-200 text-sm mt-1">{{quote?.title}} - {{items.length}}件</p>
+      </div>
+    </div>
+    <main class="max-w-5xl mx-auto px-6 -mt-6">
+      <div class="space-y-3">
+        <div v-for="(it,idx) in items" :key="it.id" class="bg-white rounded-2xl shadow-lg overflow-hidden border border-emerald-100 flex">
+          <div class="w-20 bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center text-3xl font-black">{{idx+1}}</div>
+          <div class="flex-1 p-5 grid grid-cols-4 gap-4 items-center">
+            <div class="col-span-2">
+              <p class="font-bold text-emerald-900">{{it.product_name}}</p>
+              <p class="text-xs text-gray-500 mt-1">{{it.description}}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-gray-400">単価 × 数量</p>
+              <p class="font-mono">¥{{fmt(it.unit_price)}} × {{it.qty}}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-gray-400">小計</p>
+              <p class="text-xl font-black font-mono text-emerald-700">¥{{fmt(it.subtotal)}}</p>
+            </div>
+          </div>
+        </div>
+        <div v-if="!items.length" class="text-center py-10 text-gray-400 bg-white rounded-2xl shadow">明細なし</div>
+      </div>
+      <div class="bg-emerald-800 text-white rounded-2xl p-6 mt-5 flex justify-between items-center shadow-2xl">
+        <span class="text-lg font-bold">合計</span>
+        <span class="text-3xl font-black font-mono">¥{{fmt(totalSum)}}</span>
+      </div>
+    </main>
+  </div>`,
+  setup(){
+    const route=useRoute()
+    const quote=ref(null), items=ref([])
+    const totalSum=computed(()=>items.value.reduce((s,i)=>s+(i.subtotal||0),0))
+    async function load(){
+      const res=await fetch('/api/quotes/'+route.params.qid+'/items')
+      const j=await res.json()
+      quote.value=j.quote; items.value=j.items||[]
+    }
+    onMounted(load); watch(()=>route.params.qid, load)
+    function logout(){localStorage.removeItem('user');window.location.href='/'}
+    return {route,quote,items,totalSum,logout,fmt}
+  }
+}
+
+/* ═══════════════════════ QUOTE NEW (黄、フォーム) ═══════════════════════ */
 const QuoteNewPage = {
   components:{AppHeader},
   template:`
-  <div>
+  <div class="bg-yellow-50 min-h-screen">
     <AppHeader current="new" @logout="logout"/>
-    <div class="bg-gradient-to-r from-violet-700 to-purple-600 px-6 py-6">
-      <div class="max-w-3xl mx-auto"><h1 class="text-xl font-bold text-white">新規見積作成</h1></div>
+    <div class="bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 px-6 py-8">
+      <div class="max-w-3xl mx-auto"><h1 class="text-3xl font-black text-white">📝 新規見積</h1><p class="text-yellow-100 text-sm mt-1">Step 1/3 - 情報入力</p></div>
     </div>
-    <main class="max-w-3xl mx-auto px-6 -mt-4">
-      <div class="bg-white rounded-xl shadow-lg p-8 border border-gray-200">
-        <div class="mb-5 px-3 py-2 bg-amber-50 border-l-4 border-amber-400 text-xs text-amber-700">
-          ※ 全項目入力後「確認画面へ進む」で内容確認します。
+    <main class="max-w-3xl mx-auto px-6 -mt-6">
+      <div class="bg-white rounded-2xl shadow-xl p-8 border border-yellow-200">
+        <div class="flex items-center gap-2 mb-5 text-xs">
+          <div class="px-3 py-1 bg-yellow-500 text-white rounded font-bold">入力</div>
+          <span class="text-gray-300">›</span>
+          <div class="px-3 py-1 bg-gray-200 text-gray-500 rounded">確認</div>
+          <span class="text-gray-300">›</span>
+          <div class="px-3 py-1 bg-gray-200 text-gray-500 rounded">完了</div>
         </div>
         <form @submit.prevent="goConfirm">
-          <div class="mb-4">
-            <label class="block text-sm font-bold text-gray-700 mb-1">顧客 <span class="text-red-500">*</span></label>
-            <select v-model="customer_id" required class="w-full px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm">
+          <div class="mb-4"><label class="block text-xs font-bold text-gray-700 mb-1">顧客 <span class="text-red-500">*</span></label>
+            <select v-model="customer_id" required class="w-full px-4 py-2.5 bg-yellow-50 border-2 border-yellow-300 rounded-lg text-sm">
               <option value="">選択してください</option>
               <option v-for="c in customers" :key="c.id" :value="c.id">{{c.company}}</option>
             </select>
           </div>
-          <div class="mb-4">
-            <label class="block text-sm font-bold text-gray-700 mb-1">タイトル <span class="text-red-500">*</span></label>
-            <input v-model="title" type="text" required placeholder="例: サーバ更改一式" class="w-full px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm">
-          </div>
+          <div class="mb-4"><label class="block text-xs font-bold text-gray-700 mb-1">タイトル <span class="text-red-500">*</span></label>
+            <input v-model="title" type="text" required class="w-full px-4 py-2.5 bg-yellow-50 border-2 border-yellow-300 rounded-lg text-sm"></div>
           <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label class="block text-sm font-bold text-gray-700 mb-1">小計 (税抜) <span class="text-red-500">*</span></label>
-              <input v-model="total" type="number" required placeholder="1000000" class="w-full px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm">
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-700 mb-1">有効期限</label>
-              <input v-model="valid_until" type="date" class="w-full px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm">
-            </div>
+            <div><label class="block text-xs font-bold text-gray-700 mb-1">小計 (税抜) <span class="text-red-500">*</span></label>
+              <input v-model="total" type="number" required class="w-full px-4 py-2.5 bg-yellow-50 border-2 border-yellow-300 rounded-lg text-sm"></div>
+            <div><label class="block text-xs font-bold text-gray-700 mb-1">有効期限</label>
+              <input v-model="valid_until" type="date" class="w-full px-4 py-2.5 bg-yellow-50 border-2 border-yellow-300 rounded-lg text-sm"></div>
           </div>
-          <div class="mb-6">
-            <label class="block text-sm font-bold text-gray-700 mb-1">備考</label>
-            <textarea v-model="notes" rows="4" class="w-full px-4 py-2.5 bg-gray-50 border-2 border-gray-200 rounded-lg text-sm resize-none"></textarea>
-          </div>
-          <div v-if="error" class="mb-4 p-3 rounded-lg bg-red-50 border-2 border-red-200 text-red-600 text-sm">{{error}}</div>
-          <button type="submit" class="w-full py-3 bg-violet-600 text-white rounded-lg font-bold">確認画面へ進む →</button>
+          <div class="mb-6"><label class="block text-xs font-bold text-gray-700 mb-1">備考</label>
+            <textarea v-model="notes" rows="3" class="w-full px-4 py-2.5 bg-yellow-50 border-2 border-yellow-300 rounded-lg text-sm resize-none"></textarea></div>
+          <div v-if="error" class="mb-4 p-3 bg-red-50 border-2 border-red-200 text-red-600 text-sm rounded">{{error}}</div>
+          <button type="submit" class="w-full py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg font-bold">確認画面へ →</button>
         </form>
       </div>
     </main>
@@ -467,10 +708,10 @@ const QuoteNewPage = {
     onMounted(async()=>{const r=await fetch('/api/customers'); const j=await r.json(); customers.value=j.customers||[]})
     async function goConfirm(){
       error.value=''
-      const payload={customer_id:customer_id.value, title:title.value, total:total.value, valid_until:valid_until.value, notes:notes.value}
+      const payload={customer_id:customer_id.value,title:title.value,total:total.value,valid_until:valid_until.value,notes:notes.value}
       const res=await fetch('/api/quotes/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
       if(!res.ok){const j=await res.json(); error.value=j.error||'入力エラー'; return}
-      sessionStorage.setItem('quote_draft', JSON.stringify({...payload, customer_company:(customers.value.find(c=>c.id==customer_id.value)||{}).company}))
+      sessionStorage.setItem('quote_draft',JSON.stringify({...payload,customer_company:(customers.value.find(c=>c.id==customer_id.value)||{}).company}))
       router.push('/quotes/confirm')
     }
     function logout(){localStorage.removeItem('user');window.location.href='/'}
@@ -478,53 +719,51 @@ const QuoteNewPage = {
   }
 }
 
-/* ─────────── 見積確認 (フォームゲート) ─────────── */
+/* ═══════════════════════ QUOTE CONFIRM (アンバー、確認) ═══════════════════════ */
 const QuoteConfirmPage = {
   components:{AppHeader},
   template:`
-  <div>
+  <div class="bg-amber-50 min-h-screen">
     <AppHeader current="new" @logout="logout"/>
-    <div class="bg-gradient-to-r from-violet-700 to-purple-600 px-6 py-6">
-      <div class="max-w-3xl mx-auto">
-        <div class="text-sm text-violet-200 mb-1">
-          <router-link to="/quotes/new" class="hover:text-white">新規作成</router-link>
-          <span class="mx-2">/</span><span class="text-white">確認</span>
-        </div>
-        <h1 class="text-xl font-bold text-white">入力内容確認</h1>
-      </div>
+    <div class="bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-8">
+      <div class="max-w-3xl mx-auto"><h1 class="text-3xl font-black text-white">⚠️ 入力内容確認</h1><p class="text-amber-100 text-sm mt-1">Step 2/3 - 確認</p></div>
     </div>
-    <main class="max-w-3xl mx-auto px-6 -mt-4">
-      <div v-if="draft" class="bg-white rounded-xl shadow-lg p-8 border border-gray-200">
-        <p class="text-sm text-gray-600 mb-4">以下の内容で見積を作成します。</p>
+    <main class="max-w-3xl mx-auto px-6 -mt-6">
+      <div v-if="draft" class="bg-white rounded-2xl shadow-xl p-8 border-4 border-amber-300">
+        <div class="flex items-center gap-2 mb-5 text-xs">
+          <div class="px-3 py-1 bg-gray-200 text-gray-500 rounded">入力</div>
+          <span class="text-gray-300">›</span>
+          <div class="px-3 py-1 bg-amber-500 text-white rounded font-bold">確認</div>
+          <span class="text-gray-300">›</span>
+          <div class="px-3 py-1 bg-gray-200 text-gray-500 rounded">完了</div>
+        </div>
+        <p class="text-sm text-gray-600 mb-5">下記の内容で見積を作成します。</p>
         <table class="w-full mb-6">
-          <tr class="border-b"><th class="text-left py-3 text-violet-700 w-32">顧客</th><td class="py-3" v-html="draft.customer_company"></td></tr>
-          <tr class="border-b"><th class="text-left py-3 text-violet-700">タイトル</th><td class="py-3" v-html="draft.title"></td></tr>
-          <tr class="border-b"><th class="text-left py-3 text-violet-700">小計</th><td class="py-3 font-mono">¥{{fmt(parseInt(draft.total||0))}}</td></tr>
-          <tr class="border-b"><th class="text-left py-3 text-violet-700">消費税(10%)</th><td class="py-3 font-mono">¥{{fmt(Math.floor(parseInt(draft.total||0)*0.1))}}</td></tr>
-          <tr class="border-b"><th class="text-left py-3 text-violet-700">合計</th><td class="py-3 font-mono font-bold">¥{{fmt(Math.floor(parseInt(draft.total||0)*1.1))}}</td></tr>
-          <tr class="border-b"><th class="text-left py-3 text-violet-700">有効期限</th><td class="py-3">{{draft.valid_until}}</td></tr>
-          <tr><th class="text-left py-3 text-violet-700 align-top">備考</th><td class="py-3 whitespace-pre-wrap" v-html="draft.notes"></td></tr>
+          <tr class="border-b"><th class="text-left py-2 text-amber-700 w-32">顧客</th><td class="py-2" v-html="draft.customer_company"></td></tr>
+          <tr class="border-b"><th class="text-left py-2 text-amber-700">タイトル</th><td class="py-2" v-html="draft.title"></td></tr>
+          <tr class="border-b"><th class="text-left py-2 text-amber-700">小計</th><td class="py-2 font-mono">¥{{fmt(parseInt(draft.total||0))}}</td></tr>
+          <tr class="border-b"><th class="text-left py-2 text-amber-700">税</th><td class="py-2 font-mono">¥{{fmt(Math.floor(parseInt(draft.total||0)*0.1))}}</td></tr>
+          <tr class="border-b"><th class="text-left py-2 text-amber-700 font-bold">合計</th><td class="py-2 font-mono font-bold text-xl">¥{{fmt(Math.floor(parseInt(draft.total||0)*1.1))}}</td></tr>
+          <tr class="border-b"><th class="text-left py-2 text-amber-700">期日</th><td class="py-2">{{draft.valid_until}}</td></tr>
+          <tr><th class="text-left py-2 text-amber-700 align-top">備考</th><td class="py-2 whitespace-pre-wrap" v-html="draft.notes"></td></tr>
         </table>
-        <div v-if="error" class="mb-4 p-3 rounded-lg bg-red-50 border-2 border-red-200 text-red-600 text-sm">{{error}}</div>
+        <div v-if="error" class="mb-4 p-3 bg-red-50 border-2 border-red-200 text-red-600 text-sm rounded">{{error}}</div>
         <div class="flex gap-3">
-          <router-link to="/quotes/new" class="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-bold text-sm text-center">← 戻って修正</router-link>
-          <button @click="submit" class="flex-1 py-3 bg-violet-600 text-white rounded-lg font-bold">作成する</button>
+          <router-link to="/quotes/new" class="flex-1 py-3 bg-gray-200 text-gray-700 rounded-lg font-bold text-sm text-center">← 修正</router-link>
+          <button @click="submit" class="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg font-bold">作成する</button>
         </div>
       </div>
-      <div v-else class="bg-white rounded-xl shadow-lg p-8 text-center">
-        <p class="text-5xl mb-4">⚠️</p>
-        <p class="text-gray-600 mb-4">入力データがありません。フォームから入力してください。</p>
-        <router-link to="/quotes/new" class="inline-block px-6 py-2.5 bg-violet-600 text-white rounded-lg font-bold">新規作成へ</router-link>
+      <div v-else class="bg-white rounded-2xl shadow-xl p-8 text-center">
+        <p class="text-5xl mb-3">⚠️</p>
+        <p class="text-gray-600 mb-4">入力データがありません</p>
+        <router-link to="/quotes/new" class="inline-block px-6 py-2.5 bg-amber-600 text-white rounded-lg font-bold">新規作成へ</router-link>
       </div>
     </main>
   </div>`,
   setup(){
     const router=useRouter()
     const draft=ref(null), error=ref('')
-    onMounted(()=>{
-      const raw=sessionStorage.getItem('quote_draft')
-      if(raw){try{draft.value=JSON.parse(raw)}catch(e){}}
-    })
+    onMounted(()=>{const raw=sessionStorage.getItem('quote_draft'); if(raw){try{draft.value=JSON.parse(raw)}catch(e){}}})
     async function submit(){
       error.value=''
       const res=await fetch('/api/quotes/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft.value)})
@@ -538,32 +777,40 @@ const QuoteConfirmPage = {
   }
 }
 
-/* ─────────── 見積完了 (連番チケット IDOR) ─────────── */
+/* ═══════════════════════ QUOTE COMPLETE (エメラルド、お祝い) ═══════════════════════ */
 const QuoteCompletePage = {
   components:{AppHeader},
   template:`
-  <div>
+  <div class="bg-gradient-to-br from-emerald-50 to-teal-100 min-h-screen">
     <AppHeader current="quotes" @logout="logout"/>
-    <div class="bg-gradient-to-r from-emerald-600 to-teal-500 px-6 py-6">
-      <div class="max-w-3xl mx-auto"><h1 class="text-xl font-bold text-white">作成完了</h1></div>
+    <div class="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-8">
+      <div class="max-w-3xl mx-auto"><h1 class="text-3xl font-black text-white">🎉 作成完了</h1><p class="text-emerald-100 text-sm mt-1">Step 3/3 - 完了</p></div>
     </div>
-    <main class="max-w-3xl mx-auto px-6 -mt-4" v-if="quote">
-      <div class="bg-white rounded-xl shadow-lg p-8 border border-emerald-100">
-        <div class="text-center mb-6">
-          <p class="text-5xl mb-3">✅</p>
-          <h2 class="text-xl font-bold text-emerald-700 mb-2">見積を作成しました</h2>
-          <p class="text-sm text-gray-500">チケット番号: <code class="bg-emerald-50 px-2 py-0.5 rounded font-mono font-bold text-emerald-700">{{quote.ticket}}</code></p>
+    <main class="max-w-3xl mx-auto px-6 -mt-6" v-if="quote">
+      <div class="bg-white rounded-3xl shadow-2xl p-10 border-4 border-emerald-300">
+        <div class="flex items-center gap-2 mb-5 text-xs">
+          <div class="px-3 py-1 bg-gray-200 text-gray-500 rounded">入力</div>
+          <span class="text-gray-300">›</span>
+          <div class="px-3 py-1 bg-gray-200 text-gray-500 rounded">確認</div>
+          <span class="text-gray-300">›</span>
+          <div class="px-3 py-1 bg-emerald-500 text-white rounded font-bold">完了</div>
         </div>
-        <table class="w-full text-sm">
-          <tr class="border-b"><th class="text-left py-2 text-gray-600 w-32">顧客</th><td class="py-2 font-bold">{{quote.customer_company}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">タイトル</th><td class="py-2">{{quote.title}}</td></tr>
-          <tr class="border-b"><th class="text-left py-2 text-gray-600">合計</th><td class="py-2 font-mono font-bold">¥{{fmt(quote.total+quote.tax)}}</td></tr>
-          <tr><th class="text-left py-2 text-gray-600">受付日時</th><td class="py-2 font-mono text-xs">{{quote.created_at}}</td></tr>
-        </table>
-        <p class="mt-6 text-xs text-gray-400">※ チケット番号は今後の見積照会に必要です。</p>
-        <div class="mt-4 flex gap-3">
-          <router-link :to="'/quotes/'+quote.id" class="px-4 py-2 bg-violet-600 text-white rounded font-bold text-sm">詳細を開く</router-link>
-          <router-link to="/quotes" class="px-4 py-2 bg-gray-200 text-gray-700 rounded font-bold text-sm">見積一覧へ</router-link>
+        <div class="text-center mb-6">
+          <div class="inline-flex w-24 h-24 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 items-center justify-center text-5xl mb-3 shadow-2xl">✅</div>
+          <h2 class="text-2xl font-black text-emerald-700">見積を作成しました</h2>
+          <p class="text-sm text-gray-500 mt-2">チケット番号</p>
+          <p class="text-4xl font-black font-mono text-emerald-700 mt-1">{{quote.ticket}}</p>
+        </div>
+        <div class="bg-emerald-50 rounded-xl p-5 mb-5">
+          <table class="w-full text-sm">
+            <tr><th class="text-left py-1.5 text-emerald-700 w-24">顧客</th><td class="py-1.5 font-bold">{{quote.customer_company}}</td></tr>
+            <tr><th class="text-left py-1.5 text-emerald-700">タイトル</th><td class="py-1.5">{{quote.title}}</td></tr>
+            <tr><th class="text-left py-1.5 text-emerald-700">合計</th><td class="py-1.5 font-mono font-bold">¥{{fmt(quote.total+quote.tax)}}</td></tr>
+          </table>
+        </div>
+        <div class="flex gap-3">
+          <router-link :to="'/quotes/'+quote.id" class="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-lg font-bold text-sm text-center">詳細を開く</router-link>
+          <router-link to="/quotes" class="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-bold text-sm text-center">見積一覧へ</router-link>
         </div>
       </div>
     </main>
@@ -589,15 +836,19 @@ const QuoteCompletePage = {
 
 /* ─────────── Router ─────────── */
 const routes = [
-  { path: '/', component: LoginPage },
-  { path: '/dashboard', component: DashboardPage },
-  { path: '/customers', component: CustomersPage },
-  { path: '/customers/:id', component: CustomerDetailPage },
-  { path: '/quotes', component: QuotesPage },
-  { path: '/quotes/new', component: QuoteNewPage },
-  { path: '/quotes/confirm', component: QuoteConfirmPage },
-  { path: '/quotes/complete', component: QuoteCompletePage },
-  { path: '/quotes/:id', component: QuoteDetailPage },
+  { path:'/', component:LoginPage },
+  { path:'/dashboard', component:DashboardPage },
+  { path:'/customers', component:CustomersPage },
+  { path:'/customers/:cid', component:CustomerDetailPage },
+  { path:'/customers/:cid/contacts', component:CustomerContactsPage },
+  { path:'/customers/:cid/contacts/:contact_id', component:ContactDetailPage },
+  { path:'/contacts/:contact_id', component:ContactDetailPage },
+  { path:'/quotes', component:QuotesPage },
+  { path:'/quotes/new', component:QuoteNewPage },
+  { path:'/quotes/confirm', component:QuoteConfirmPage },
+  { path:'/quotes/complete', component:QuoteCompletePage },
+  { path:'/quotes/:qid', component:QuoteDetailPage },
+  { path:'/quotes/:qid/items', component:QuoteItemsPage },
 ]
 const router = createRouter({ history: createWebHistory('/'), routes })
 createApp({ template:'<router-view />' }).use(router).mount('#app')
