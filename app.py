@@ -603,14 +603,32 @@ def quote_approve(quote_id):
         elif not check_supervisor:
             error = '「上長確認済み」のチェックが必要です'
         else:
-            # 承認成功 → status 更新 + トークン付き完了画面へ
+            # 承認成功 → status 更新 + 新しい下書きを自動生成（デモ運用のため）
             conn = get_db()
             conn.execute("UPDATE quotes SET status='accepted' WHERE id=?", (quote_id,))
+            # 新しい下書きを自動追加
+            import random
+            samples = [
+                ('追加サーバ増設',     3500000),
+                ('クラウド移行支援',   6800000),
+                ('VPN強化対応',        1800000),
+                ('運用保守延長',       2200000),
+                ('セキュリティ研修',    950000),
+                ('SSL証明書更新',       450000),
+                ('ログ分析基盤導入',  5400000),
+            ]
+            t, total = random.choice(samples)
+            cur = conn.execute("SELECT MAX(CAST(SUBSTR(ticket,3) AS INTEGER)) FROM quotes WHERE ticket LIKE 'Q-%'")
+            last = cur.fetchone()[0] or 1000
+            new_ticket = f'Q-{int(last)+1}'
+            conn.execute("""INSERT INTO quotes (ticket, customer_id, title, status, total, tax, valid_until, created_by, created_at, notes)
+                            VALUES (?, ?, ?, 'draft', ?, ?, '2026-12-31', 2, datetime('now'), '承認後自動生成（デモ用）')""",
+                         (new_ticket, quote['customer_id'], t, total, int(total*0.1)))
             conn.commit()
             conn.close()
             import hashlib
             token = hashlib.md5(f'{quote_id}-{approval_code}-{rank}'.encode()).hexdigest()[:12]
-            return redirect(f'/quotes/{quote_id}/approved?token={token}&rank={rank}')
+            return redirect(f'/quotes/{quote_id}/approved?token={token}&rank={rank}&next_draft={new_ticket}')
 
     return Response(f'''<!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8"><title>見積上長承認 - DAST Demo Site</title>{APPROVE_CSS}
@@ -691,6 +709,7 @@ def quote_approve(quote_id):
 def quote_approved(quote_id):
     token = request.args.get('token', '')
     rank = request.args.get('rank', '')
+    next_draft = request.args.get('next_draft', '')
     if not token or len(token) != 12 or rank not in ('A', 'B', 'C'):
         return redirect(f'/quotes/{quote_id}/approve')
     conn = get_db()
@@ -739,6 +758,7 @@ def quote_approved(quote_id):
       <a href="/quotes" style="flex:1;padding:12px 20px;background:#e5e7eb;color:#374151;border-radius:8px;font-weight:bold;text-decoration:none">見積一覧へ</a>
     </div>
   </div>
+  {'<div class="card" style="background:#fef3c7;border:2px dashed #f59e0b;margin-top:18px"><p style="margin:0;font-size:14px;color:#92400e">✨ <strong>新しい下書き「'+next_draft+'」が自動生成されました</strong>。デモを繰り返せるよう、見積一覧にもう1件「🎯DEMO」マークの下書きが追加されています。</p></div>' if next_draft else ''}
 </div>
 </body></html>''', mimetype='text/html')
 
