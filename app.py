@@ -758,7 +758,6 @@ def quote_approved(quote_id):
       <a href="/quotes" style="flex:1;padding:12px 20px;background:#e5e7eb;color:#374151;border-radius:8px;font-weight:bold;text-decoration:none">見積一覧へ</a>
     </div>
   </div>
-  {'<div class="card" style="background:#fef3c7;border:2px dashed #f59e0b;margin-top:18px"><p style="margin:0;font-size:14px;color:#92400e">✨ <strong>新しい下書き「'+next_draft+'」が自動生成されました</strong>。デモを繰り返せるよう、見積一覧にもう1件「🎯DEMO」マークの下書きが追加されています。</p></div>' if next_draft else ''}
 </div>
 </body></html>''', mimetype='text/html')
 
