@@ -192,7 +192,17 @@ def sitemap():
 
 @app.route('/robots.txt')
 def robots():
-    return Response("User-agent: *\nAllow: /\nDisallow: /admin/\nSitemap: https://sub.3sec-demo.com/sitemap.xml\n", mimetype='text/plain')
+    return Response("""User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /quotes/new
+Disallow: /quotes/confirm
+Disallow: /quotes/complete
+Disallow: /api/quotes/submit
+Disallow: /api/quotes/confirm
+Disallow: /api/quotes/by-ticket/
+Sitemap: https://sub.3sec-demo.com/sitemap.xml
+""", mimetype='text/plain')
 
 
 # ═══════════════════════════════════════════════════════════
