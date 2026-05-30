@@ -304,7 +304,10 @@ const QuotesPage = {
               <td class="px-4 py-3 text-right font-mono font-bold">¥{{fmt(q.total+q.tax)}}</td>
               <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-bold text-white" :class="STATUS_COLOR[q.status]">{{STATUS_LABEL[q.status]}}</span></td>
               <td class="px-4 py-3 text-xs text-gray-500">{{q.valid_until}}</td>
-              <td class="px-4 py-3"><router-link :to="'/quotes/'+q.id" class="text-violet-700 text-xs underline">詳細</router-link></td>
+              <td class="px-4 py-3 whitespace-nowrap">
+                <router-link :to="'/quotes/'+q.id" class="text-violet-700 text-xs underline mr-3">詳細</router-link>
+                <button @click="deleteQuote(q)" class="text-red-600 text-xs underline hover:text-red-800">削除</button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -313,9 +316,16 @@ const QuotesPage = {
   </div>`,
   setup(){
     const quotes=ref([])
-    onMounted(async()=>{const res=await fetch('/api/quotes'); const j=await res.json(); quotes.value=j.quotes||[]})
+    async function load(){const res=await fetch('/api/quotes'); const j=await res.json(); quotes.value=j.quotes||[]}
+    async function deleteQuote(q){
+      if(!confirm(`見積 ${q.ticket}（${q.customer_company} / ${q.title}）を削除しますか？\nこの操作は取り消せません。`)) return
+      const res=await fetch('/api/quotes/'+q.id, {method:'DELETE'})
+      const j=await res.json()
+      if(j.success){ await load() } else { alert('削除失敗: '+(j.error||'unknown')) }
+    }
+    onMounted(load)
     function logout(){localStorage.removeItem('user');window.location.href='/'}
-    return {quotes,logout,fmt,STATUS_LABEL,STATUS_COLOR}
+    return {quotes,deleteQuote,logout,fmt,STATUS_LABEL,STATUS_COLOR}
   }
 }
 
@@ -355,6 +365,7 @@ const QuoteDetailPage = {
         </table>
         <div class="mt-5 flex gap-3">
           <a :href="'/quotes/'+quote.id+'/pdf?file=quote_'+quote.ticket+'.pdf'" target="_blank" class="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-bold">📄 PDFダウンロード</a>
+          <button @click="deleteQuote" class="ml-auto px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700">🗑 削除</button>
         </div>
       </div>
       <div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
@@ -390,8 +401,16 @@ const QuoteDetailPage = {
       else{quote.value=j.quote; items.value=j.items||[]}
     }
     onMounted(load); watch(()=>route.params.id, load)
+    const router=useRouter()
+    async function deleteQuote(){
+      if(!quote.value) return
+      if(!confirm(`見積 ${quote.value.ticket}（${quote.value.customer_company} / ${quote.value.title}）を削除しますか？\nこの操作は取り消せません。`)) return
+      const res=await fetch('/api/quotes/'+quote.value.id, {method:'DELETE'})
+      const j=await res.json()
+      if(j.success){ router.push('/quotes') } else { alert('削除失敗: '+(j.error||'unknown')) }
+    }
     function logout(){localStorage.removeItem('user');window.location.href='/'}
-    return {quote,items,error,logout,fmt,STATUS_LABEL,STATUS_COLOR}
+    return {quote,items,error,deleteQuote,logout,fmt,STATUS_LABEL,STATUS_COLOR}
   }
 }
 

@@ -299,6 +299,25 @@ def api_quote_detail(quote_id):
         return jsonify({'error': 'You have an error in your SQL syntax: ' + str(e), 'sql': sql}), 500
 
 
+@app.route('/api/quotes/<quote_id>', methods=['DELETE', 'OPTIONS'])
+def api_quote_delete(quote_id):
+    # VULN: 認可チェック無し (任意ユーザーが任意見積を削除可能、CSRFも可能)
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        conn = get_db()
+        conn.execute("DELETE FROM quote_items WHERE quote_id=?", (int(quote_id),))
+        cur = conn.execute("DELETE FROM quotes WHERE id=?", (int(quote_id),))
+        conn.commit()
+        deleted = cur.rowcount
+        conn.close()
+        if deleted == 0:
+            return jsonify({'error': '見積が見つかりません'}), 404
+        return jsonify({'success': True, 'deleted_id': int(quote_id)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/quotes/by-ticket/<ticket>')
 def api_quote_by_ticket(ticket):
     # VULN: IDOR (連番 Q-1001..) 認証なし
