@@ -197,7 +197,8 @@ def sitemap():
 def robots():
     return Response("""User-agent: *
 Allow: /
-Disallow: /admin/
+Allow: /admin/export
+Allow: /search
 Disallow: /admin/reset
 Disallow: /quotes/new
 Disallow: /quotes/confirm
