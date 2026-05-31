@@ -185,7 +185,10 @@ def sitemap():
   <url><loc>https://sub.3sec-demo.com/admin/export</loc></url>
   <url><loc>https://sub.3sec-demo.com/admin/export?format=csv</loc></url>
   <url><loc>https://sub.3sec-demo.com/admin/export?fetch_url=https://example.com</loc></url>
+  <url><loc>https://sub.3sec-demo.com/search</loc></url>
+  <url><loc>https://sub.3sec-demo.com/search?q=sample</loc></url>
   <url><loc>https://sub.3sec-demo.com/api/customers?id=1</loc></url>
+  <url><loc>https://sub.3sec-demo.com/api/customers?q=sample</loc></url>
 </urlset>"""
     return Response(xml, mimetype='application/xml')
 
@@ -716,6 +719,70 @@ h1{color:#9a3412;margin:0 0 10px}
 <button type="submit" class="btn btn-danger">🔄 リセット実行</button>
 </form>
 </div></body></html>''', mimetype='text/html')
+
+
+# ═══════════════════════════════════════════════════════════
+# 横断検索 (顧客・見積) - HTMLフォーム
+# VULN: SQL Injection (q) + Reflected XSS + MySQL風エラーシグネチャ
+# ═══════════════════════════════════════════════════════════
+@app.route('/search')
+def cross_search():
+    q = request.args.get('q', '')
+    if not q:
+        return Response('''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>横断検索</title>
+<style>body{font-family:'Helvetica Neue',sans-serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1f2937}
+h1{color:#1e3a5f}input{padding:10px 14px;border:2px solid #cbd5e1;border-radius:8px;font-size:14px;width:60%}
+button{padding:10px 22px;background:#2563eb;color:#fff;border:0;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer}
+table{width:100%;border-collapse:collapse;margin-top:20px}th{background:#1e3a5f;color:#fff;padding:8px;text-align:left}
+td{padding:8px;border-bottom:1px solid #e2e8f0}</style></head>
+<body>
+<h1>🔍 横断検索</h1>
+<p>顧客名・見積タイトルを横断的に検索できます。</p>
+<form method="GET" action="/search">
+  <input name="q" placeholder="顧客名 / 見積タイトル / 担当者名" autofocus>
+  <button type="submit">検索</button>
+</form>
+<p style="font-size:12px;color:#6b7280;margin-top:18px">サンプル: <a href="/search?q=サーバ">サーバ</a> / <a href="/search?q=サンプル">サンプル</a></p>
+</body></html>''', mimetype='text/html')
+
+    # VULN: SQL Injection via LIKE 文字列連結
+    sql = ("SELECT q.id, q.ticket, q.title, q.total, q.status, c.company FROM quotes q "
+           "LEFT JOIN customers c ON q.customer_id=c.id "
+           "WHERE q.title LIKE '%" + q + "%' OR c.company LIKE '%" + q + "%' OR c.name LIKE '%" + q + "%'")
+    try:
+        conn = get_db()
+        rows = conn.execute(sql).fetchall()
+        conn.close()
+        result_rows = ''.join(
+            f'<tr><td>{r["ticket"]}</td><td>{r["company"]}</td><td>{r["title"]}</td><td>¥{r["total"]:,}</td><td>{r["status"]}</td></tr>'
+            for r in rows
+        )
+        # VULN: Reflected XSS - q をエスケープせず埋め込み
+        return Response(f'''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>検索結果: {q}</title>
+<style>body{{font-family:'Helvetica Neue',sans-serif;max-width:900px;margin:40px auto;padding:0 20px;color:#1f2937}}
+table{{width:100%;border-collapse:collapse;margin-top:20px}}th{{background:#1e3a5f;color:#fff;padding:8px;text-align:left}}
+td{{padding:8px;border-bottom:1px solid #e2e8f0}}</style></head>
+<body>
+<h1>検索結果: {q}</h1>
+<p>実行SQL: <code>{sql}</code></p>
+<p>該当: {len(rows)} 件</p>
+<table><tr><th>チケット</th><th>会社</th><th>タイトル</th><th>金額</th><th>状態</th></tr>{result_rows}</table>
+<p><a href="/search">← 戻る</a></p>
+</body></html>''', mimetype='text/html')
+    except Exception as e:
+        # VULN: SQL syntax error 露出 + 500 (Securify が SQLi 確定しやすい "You have an error in your SQL syntax" シグネチャ)
+        return Response(f'''<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>Database Error</title></head>
+<body style="font-family:Arial;max-width:900px;margin:40px auto;padding:0 20px">
+<h1>Database Error</h1>
+<p><strong>You have an error in your SQL syntax:</strong> {str(e)}</p>
+<p>mysql_fetch_array(): supplied argument is not a valid result resource</p>
+<p><strong>Query:</strong> <code>{sql}</code></p>
+<p><strong>Input q:</strong> {q}</p>
+<a href="/search">戻る</a>
+</body></html>''', mimetype='text/html', status=500)
 
 
 # ═══════════════════════════════════════════════════════════
