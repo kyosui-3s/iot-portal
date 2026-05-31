@@ -670,15 +670,10 @@ def quote_approved(quote_id):
 def admin_reset():
     if request.method == 'POST':
         # DAST スキャナ等の自動巡回からの誤実行を防ぐ
-        # - 同一オリジンの Referer を要求
-        # - 簡易確認トークンを要求
+        # 確認トークンを必須化（cron も同じ token を送る）
         token = request.form.get('confirm') or request.args.get('confirm') or ''
-        referer = request.headers.get('Referer', '')
-        # ローカル localhost からの cron 呼び出しは許可
-        is_local = request.remote_addr in ('127.0.0.1', '::1', 'localhost')
-        if not is_local:
-            if 'sub.3sec-demo.com/admin/reset' not in referer or token != 'yes-reset':
-                return Response('Forbidden: confirm token or referer missing', status=403, mimetype='text/plain')
+        if token != 'yes-reset':
+            return Response('Forbidden: confirm token missing', status=403, mimetype='text/plain')
         init_db()
         return Response('''<!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8"><title>リセット完了</title>
