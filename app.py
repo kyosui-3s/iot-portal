@@ -669,6 +669,16 @@ def quote_approved(quote_id):
 @app.route('/admin/reset', methods=['GET', 'POST'])
 def admin_reset():
     if request.method == 'POST':
+        # DAST スキャナ等の自動巡回からの誤実行を防ぐ
+        # - 同一オリジンの Referer を要求
+        # - 簡易確認トークンを要求
+        token = request.form.get('confirm') or request.args.get('confirm') or ''
+        referer = request.headers.get('Referer', '')
+        # ローカル localhost からの cron 呼び出しは許可
+        is_local = request.remote_addr in ('127.0.0.1', '::1', 'localhost')
+        if not is_local:
+            if 'sub.3sec-demo.com/admin/reset' not in referer or token != 'yes-reset':
+                return Response('Forbidden: confirm token or referer missing', status=403, mimetype='text/plain')
         init_db()
         return Response('''<!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8"><title>リセット完了</title>
@@ -706,6 +716,7 @@ h1{color:#9a3412;margin:0 0 10px}
 </div>
 <p style="color:#6b7280;font-size:12px">※ デモ前に実行することを推奨します</p>
 <form method="POST" action="/admin/reset" style="margin-top:16px;display:flex;gap:10px;justify-content:center">
+<input type="hidden" name="confirm" value="yes-reset">
 <a href="/dashboard" class="btn btn-secondary">キャンセル</a>
 <button type="submit" class="btn btn-danger">🔄 リセット実行</button>
 </form>
