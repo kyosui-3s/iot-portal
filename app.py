@@ -73,8 +73,11 @@ def init_db():
         (6, 3, '鈴木 一郎',  'suzuki@test-elec.co.jp',     '052-3456-7890','取締役'),
         (7, 3, '小林 主任',  'kobayashi@test-elec.co.jp',  '052-3456-7891','資材主任'),
     ])
-    # ─── Quotes (5件、ticketは連番 Q-1001 から) ───
+    # ─── Quotes (固定DEMOチケット + 通常5件) ───
+    # Q-DEMO は Securify 診断マップ用の固定ページ。
+    # リセット・新規追加に関わらず常に存在し、見積一覧の最上段に固定表示される。
     quotes_data = [
+        (999,'Q-DEMO', 1, '【固定デモ】Securify診断マップ用シナリオ', 'draft', 1000000, 100000, '2099-12-31', 2, '2026-05-01 09:00:00', 'このチケットは診断マップ機能のデモ用に固定。リセットや新規追加に関わらず常に最上段に表示されます。'),
         (1, 'Q-1001', 1, 'サーバ更改一式',     'sent',     8500000, 850000, '2026-06-30', 2, '2026-05-01 10:00:00', '初回見積'),
         (2, 'Q-1002', 2, 'EC構築プロジェクト', 'accepted', 25000000,2500000,'2026-06-15', 2, '2026-04-20 09:00:00', '基本契約済'),
         (3, 'Q-1003', 3, 'IoT センサー導入',   'sent',     4800000, 480000, '2026-07-01', 3, '2026-05-10 11:00:00', '工場ライン3用'),
@@ -113,6 +116,7 @@ def init_db():
     # PDFディレクトリ準備（Path Traversal デモ用）
     os.makedirs(PDF_DIR, exist_ok=True)
     sample_pdfs = {
+        'quote_Q-DEMO.pdf': 'QUOTE Q-DEMO\n\n【固定デモ】Securify 診断マップ用シナリオ\nCustomer: 株式会社サンプル工業\nTotal: 1,000,000 JPY\n',
         'quote_Q-1001.pdf': 'QUOTE Q-1001\n\nCustomer: 株式会社サンプル工業\nTitle: サーバ更改一式\nTotal: 8,500,000 JPY\nValid until: 2026-06-30\n',
         'quote_Q-1002.pdf': 'QUOTE Q-1002\n\nCustomer: 株式会社デモ商事\nTitle: EC構築プロジェクト\nTotal: 25,000,000 JPY\n',
         'quote_Q-1003.pdf': 'QUOTE Q-1003\n\nCustomer: テスト電子株式会社\nTitle: IoT センサー導入\nTotal: 4,800,000 JPY\n',
@@ -336,9 +340,10 @@ def api_quote_items(quote_id):
 @app.route('/api/quotes')
 def api_quotes_list():
     conn = get_db()
+    # Q-DEMO は常に最上段に固定、それ以外は id DESC（新しい順）
     rows = conn.execute("""SELECT q.*, c.company AS customer_company, c.name AS customer_name
                            FROM quotes q LEFT JOIN customers c ON q.customer_id=c.id
-                           ORDER BY q.id DESC""").fetchall()
+                           ORDER BY CASE WHEN q.ticket='Q-DEMO' THEN 0 ELSE 1 END, q.id DESC""").fetchall()
     conn.close()
     return jsonify({'quotes': [dict(r) for r in rows]})
 
@@ -366,6 +371,11 @@ def api_quote_delete(quote_id):
         return '', 204
     try:
         conn = get_db()
+        # 固定デモチケット Q-DEMO は削除不可
+        target = conn.execute("SELECT ticket FROM quotes WHERE id=?", (int(quote_id),)).fetchone()
+        if target and target['ticket'] == 'Q-DEMO':
+            conn.close()
+            return jsonify({'error': 'このチケットは診断マップ用に固定されており削除できません'}), 403
         conn.execute("DELETE FROM quote_items WHERE quote_id=?", (int(quote_id),))
         cur = conn.execute("DELETE FROM quotes WHERE id=?", (int(quote_id),))
         conn.commit()
@@ -509,7 +519,10 @@ def quote_approve(quote_id):
         else:
             # 承認成功 → status 更新 + 新しい下書きを自動生成（デモ運用のため）
             conn = get_db()
-            conn.execute("UPDATE quotes SET status='accepted' WHERE id=?", (quote_id,))
+            # Q-DEMO チケットは status 変更不可（draft固定）
+            target_ticket = conn.execute("SELECT ticket FROM quotes WHERE id=?", (quote_id,)).fetchone()
+            if not target_ticket or target_ticket['ticket'] != 'Q-DEMO':
+                conn.execute("UPDATE quotes SET status='accepted' WHERE id=?", (quote_id,))
             # 新しい下書きを自動追加
             import random
             samples = [
@@ -522,7 +535,8 @@ def quote_approve(quote_id):
                 ('ログ分析基盤導入',  5400000),
             ]
             t, total = random.choice(samples)
-            cur = conn.execute("SELECT MAX(CAST(SUBSTR(ticket,3) AS INTEGER)) FROM quotes WHERE ticket LIKE 'Q-%'")
+            # Q-DEMO や 数値以外のチケットは除外して最大値を取る
+            cur = conn.execute("SELECT MAX(CAST(SUBSTR(ticket,3) AS INTEGER)) FROM quotes WHERE ticket GLOB 'Q-[0-9]*'")
             last = cur.fetchone()[0] or 1000
             new_ticket = f'Q-{int(last)+1}'
             conn.execute("""INSERT INTO quotes (ticket, customer_id, title, status, total, tax, valid_until, created_by, created_at, notes)
