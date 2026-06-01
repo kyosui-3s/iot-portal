@@ -480,25 +480,25 @@ const QuotesPage = {
         </div>
       </div>
       <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-violet-100">
-        <table class="w-full text-sm">
+        <table class="w-full text-sm table-fixed">
           <thead><tr class="bg-violet-800 text-white">
-            <th class="text-left px-4 py-3">チケット</th><th class="text-left px-4 py-3">顧客</th><th class="text-left px-4 py-3">タイトル</th><th class="text-right px-4 py-3">小計</th><th class="text-right px-4 py-3">税</th><th class="text-right px-4 py-3">合計</th><th class="text-left px-4 py-3">状態</th><th class="text-left px-4 py-3">期日</th><th></th>
+            <th class="text-left px-4 py-3 w-24">チケット</th><th class="text-left px-4 py-3 w-44">顧客</th><th class="text-left px-4 py-3">タイトル</th><th class="text-right px-4 py-3 w-28">小計</th><th class="text-right px-4 py-3 w-24">税</th><th class="text-right px-4 py-3 w-28">合計</th><th class="text-left px-4 py-3 w-32">状態</th><th class="text-left px-4 py-3 w-24">期日</th><th class="w-28"></th>
           </tr></thead>
           <tbody>
             <tr v-for="(q,i) in quotes" :key="q.id" :class="i%2?'bg-violet-50':'bg-white'" class="border-b border-violet-100 hover:bg-violet-100">
-              <td class="px-4 py-3 font-mono text-violet-700 font-bold">{{q.ticket}}</td>
-              <td class="px-4 py-3">{{q.customer_company}}</td>
-              <td class="px-4 py-3">{{q.title}}</td>
-              <td class="px-4 py-3 text-right font-mono">¥{{fmt(q.total)}}</td>
-              <td class="px-4 py-3 text-right font-mono text-gray-500 text-xs">¥{{fmt(q.tax)}}</td>
-              <td class="px-4 py-3 text-right font-mono font-bold">¥{{fmt(q.total+q.tax)}}</td>
+              <td class="px-4 py-3 font-mono text-violet-700 font-bold whitespace-nowrap">{{q.ticket}}</td>
+              <td class="px-4 py-3 whitespace-nowrap overflow-hidden text-ellipsis" :title="q.customer_company">{{q.customer_company}}</td>
+              <td class="px-4 py-3 truncate" :title="q.title">{{q.title}}</td>
+              <td class="px-4 py-3 text-right font-mono whitespace-nowrap">¥{{fmt(q.total)}}</td>
+              <td class="px-4 py-3 text-right font-mono text-gray-500 text-xs whitespace-nowrap">¥{{fmt(q.tax)}}</td>
+              <td class="px-4 py-3 text-right font-mono font-bold whitespace-nowrap">¥{{fmt(q.total+q.tax)}}</td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <div class="inline-flex items-center gap-1">
                   <span class="px-2 py-1 rounded text-xs font-bold text-white" :class="STATUS_COLOR[q.status]">{{STATUS_LABEL[q.status]}}</span>
                   <span v-if="q.status==='draft'" class="px-2 py-1 rounded bg-yellow-300 text-yellow-900 text-xs font-bold">🎯DEMO</span>
                 </div>
               </td>
-              <td class="px-4 py-3 text-xs text-gray-500">{{q.valid_until}}</td>
+              <td class="px-4 py-3 text-xs text-gray-500 truncate" :title="q.valid_until">{{q.valid_until}}</td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <router-link :to="'/quotes/'+q.id" class="text-violet-700 text-xs underline mr-3">詳細</router-link>
                 <button @click="deleteQuote(q)" class="text-red-600 text-xs underline">削除</button>
