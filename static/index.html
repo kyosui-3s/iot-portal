@@ -479,13 +479,18 @@ const QuotesPage = {
           <strong>DAST 手動巡回デモ：</strong>「下書き」状態の見積（行末に <span class="px-2 py-0.5 rounded bg-yellow-300 text-yellow-900 text-xs font-bold">DEMO対象</span> マーク）を開くと、上長承認シナリオが体験できます
         </div>
       </div>
-      <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-violet-100">
-        <table class="w-full text-sm table-fixed">
+      <div class="bg-white rounded-2xl shadow-xl border border-violet-100">
+        <div v-if="quotes.length > displayLimit" class="px-4 py-3 bg-violet-50 border-b border-violet-200 text-xs text-violet-900 flex justify-between items-center">
+          <span>表示中: <strong>{{displayedQuotes.length}}件</strong> / 全 <strong>{{quotes.length}}件</strong>（Q-DEMO + 最新 {{displayLimit}} 件のみ表示）</span>
+          <button @click="showAll=!showAll" class="text-violet-700 underline font-bold">{{showAll?'制限表示に戻す':'全件表示'}}</button>
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm table-fixed" style="min-width:1100px">
           <thead><tr class="bg-violet-800 text-white">
-            <th class="text-left px-4 py-3 w-24">チケット</th><th class="text-left px-4 py-3 w-44">顧客</th><th class="text-left px-4 py-3">タイトル</th><th class="text-right px-4 py-3 w-28">小計</th><th class="text-right px-4 py-3 w-24">税</th><th class="text-right px-4 py-3 w-28">合計</th><th class="text-left px-4 py-3 w-32">状態</th><th class="text-left px-4 py-3 w-24">期日</th><th class="w-28"></th>
+            <th class="text-left px-4 py-3 w-24">チケット</th><th class="text-left px-4 py-3 w-44">顧客</th><th class="text-left px-4 py-3">タイトル</th><th class="text-right px-4 py-3 w-28">小計</th><th class="text-right px-4 py-3 w-24">税</th><th class="text-right px-4 py-3 w-28">合計</th><th class="text-left px-4 py-3 w-32">状態</th><th class="text-left px-4 py-3 w-28">期日</th><th class="w-32"></th>
           </tr></thead>
           <tbody>
-            <tr v-for="(q,i) in quotes" :key="q.id" :class="i%2?'bg-violet-50':'bg-white'" class="border-b border-violet-100 hover:bg-violet-100">
+            <tr v-for="(q,i) in displayedQuotes" :key="q.id" :class="i%2?'bg-violet-50':'bg-white'" class="border-b border-violet-100 hover:bg-violet-100">
               <td class="px-4 py-3 font-mono text-violet-700 font-bold whitespace-nowrap">{{q.ticket}}</td>
               <td class="px-4 py-3 whitespace-nowrap overflow-hidden text-ellipsis" :title="q.customer_company">{{q.customer_company}}</td>
               <td class="px-4 py-3 truncate" :title="q.title">{{q.title}}</td>
@@ -506,20 +511,30 @@ const QuotesPage = {
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </main>
   </div>`,
   setup(){
     const quotes=ref([])
+    const showAll=ref(false)
+    const displayLimit=30
+    const displayedQuotes=computed(()=>{
+      if(showAll.value) return quotes.value
+      // Q-DEMO は常に先頭、それ以降は最新 displayLimit 件まで
+      const demo=quotes.value.filter(q=>q.ticket==='Q-DEMO')
+      const others=quotes.value.filter(q=>q.ticket!=='Q-DEMO').slice(0,displayLimit)
+      return [...demo, ...others]
+    })
     async function load(){const r=await fetch('/api/quotes'); const j=await r.json(); quotes.value=j.quotes||[]}
     async function deleteQuote(q){
       if(!confirm(`見積 ${q.ticket} を削除しますか？`)) return
       const r=await fetch('/api/quotes/'+q.id,{method:'DELETE'}); const j=await r.json()
-      if(j.success) load(); else alert('削除失敗')
+      if(j.success) load(); else alert(j.error||'削除失敗')
     }
     onMounted(load)
     function logout(){localStorage.removeItem('user');window.location.href='/'}
-    return {quotes,deleteQuote,logout,fmt,STATUS_LABEL,STATUS_COLOR}
+    return {quotes,displayedQuotes,showAll,displayLimit,deleteQuote,logout,fmt,STATUS_LABEL,STATUS_COLOR}
   }
 }
 
