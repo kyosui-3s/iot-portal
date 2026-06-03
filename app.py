@@ -141,8 +141,7 @@ def add_headers(response):
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = '*'
-    # VULN: 偽装 Server ヘッダー
-    response.headers['Server'] = 'Apache/2.4.49 (Unix)'
+    # Server ヘッダー偽装は ASM ノイズの原因になるので解除（nginx の実値で出る）
     # VULN: セキュリティヘッダー未設定 (X-Frame-Options, CSP, HSTS etc.)
     return response
 
