@@ -476,7 +476,7 @@ const QuotesPage = {
       <div class="mb-4 p-4 rounded-xl bg-amber-50 border-2 border-dashed border-amber-400 flex items-center gap-3">
         <span class="text-2xl">🎯</span>
         <div class="flex-1 text-sm text-amber-900">
-          <strong>DAST 手動巡回デモ：</strong>「下書き」状態の見積（行末に <span class="px-2 py-0.5 rounded bg-yellow-300 text-yellow-900 text-xs font-bold">DEMO対象</span> マーク）を開くと、上長承認シナリオが体験できます
+          <strong>DAST 手動巡回デモ：</strong>最上段の <span class="px-2 py-0.5 rounded bg-yellow-300 text-yellow-900 text-xs font-bold font-mono">Q-DEMO</span> を開くと、上長承認シナリオ（自動巡回では到達不可）が体験できます
         </div>
       </div>
       <div class="bg-white rounded-2xl shadow-xl border border-violet-100">
@@ -500,7 +500,7 @@ const QuotesPage = {
               <td class="px-4 py-3 whitespace-nowrap">
                 <div class="inline-flex items-center gap-1">
                   <span class="px-2 py-1 rounded text-xs font-bold text-white" :class="STATUS_COLOR[q.status]">{{STATUS_LABEL[q.status]}}</span>
-                  <span v-if="q.status==='draft'" class="px-2 py-1 rounded bg-yellow-300 text-yellow-900 text-xs font-bold">🎯DEMO</span>
+                  <span v-if="q.ticket==='Q-DEMO'" class="px-2 py-1 rounded bg-yellow-300 text-yellow-900 text-xs font-bold">🎯DEMO</span>
                 </div>
               </td>
               <td class="px-4 py-3 text-xs text-gray-500 truncate" :title="q.valid_until">{{q.valid_until}}</td>
@@ -551,8 +551,8 @@ const QuoteDetailPage = {
       </div>
     </div>
     <main class="max-w-4xl mx-auto px-6 py-8" v-if="quote">
-      <!-- DAST デモ手動巡回案内 (draft 状態のときだけ表示) -->
-      <div v-if="quote.status!=='accepted'" class="mb-5 p-5 rounded-2xl bg-gradient-to-r from-yellow-100 to-amber-100 border-2 border-dashed border-amber-500 shadow-lg">
+      <!-- DAST デモ手動巡回案内 (Q-DEMO のときだけ表示) -->
+      <div v-if="quote.ticket==='Q-DEMO'" class="mb-5 p-5 rounded-2xl bg-gradient-to-r from-yellow-100 to-amber-100 border-2 border-dashed border-amber-500 shadow-lg">
         <div class="flex items-start gap-3">
           <div class="text-3xl">🎯</div>
           <div class="flex-1">
@@ -601,7 +601,7 @@ const QuoteDetailPage = {
           <div class="flex gap-3 flex-wrap">
             <router-link :to="'/quotes/'+quote.id+'/items'" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-bold text-sm">📦 明細を見る ({{items.length}})</router-link>
             <a :href="'/quotes/'+quote.id+'/pdf?file=quote_'+quote.ticket+'.pdf'" target="_blank" class="px-5 py-2.5 bg-amber-600 text-white rounded-lg font-bold text-sm">📄 PDF</a>
-            <a v-if="quote.status!=='accepted'" :href="'/quotes/'+quote.id+'/approve'" class="px-5 py-2.5 bg-teal-700 text-white rounded-lg font-bold text-sm">🔐 上長承認を申請</a>
+            <a v-if="quote.ticket==='Q-DEMO'" :href="'/quotes/'+quote.id+'/approve'" class="px-5 py-2.5 bg-teal-700 text-white rounded-lg font-bold text-sm">🔐 上長承認を申請</a>
             <button @click="deleteQuote" class="ml-auto px-5 py-2.5 bg-red-600 text-white rounded-lg font-bold text-sm">🗑 削除</button>
           </div>
         </div>
