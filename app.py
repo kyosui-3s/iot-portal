@@ -426,13 +426,34 @@ def api_quote_submit():
         return jsonify({'error': '必須項目が未入力です'}), 422
     conn = get_db()
     # VULN: 連番チケット (IDOR で他の見積を閲覧可能)
-    cur = conn.execute("SELECT MAX(CAST(SUBSTR(ticket,3) AS INTEGER)) FROM quotes WHERE ticket LIKE 'Q-%'")
+    # GLOB で 'Q-数字' 形式のみ対象（Q-DEMO や payload文字列を除外）
+    cur = conn.execute("SELECT MAX(CAST(SUBSTR(ticket,3) AS INTEGER)) FROM quotes WHERE ticket GLOB 'Q-[0-9]*'")
     last = cur.fetchone()[0] or 1000
     new_ticket = f'Q-{int(last)+1}'
     conn.execute("""INSERT INTO quotes (ticket, customer_id, title, status, total, tax, valid_until, created_by, created_at, notes)
                     VALUES (?, ?, ?, 'draft', ?, ?, ?, 2, datetime('now'), ?)""",
                  (new_ticket, data.get('customer_id'), data.get('title'), int(data.get('total', 0)),
                   int(int(data.get('total', 0)) * 0.1), data.get('valid_until', '2026-12-31'), data.get('notes', '')))
+
+    # ── 上限超過時の自動間引き ──
+    # 全体上限 = 20件 (Q-DEMO + 通常)
+    # 保護対象: Q-DEMO + シードデータ (id 1〜5) → 計6件
+    # 新規追加分は 14件まで → 超過分は古いものから削除
+    MAX_TOTAL = 20
+    PROTECTED_CONDITION = "(ticket='Q-DEMO' OR id BETWEEN 1 AND 5)"
+    extra_count = conn.execute(f"SELECT COUNT(*) FROM quotes WHERE NOT {PROTECTED_CONDITION}").fetchone()[0]
+    keep_extra = MAX_TOTAL - 6  # 保護6件 → 残り14枠
+    if extra_count > keep_extra:
+        # 削除対象 = 保護対象を除く、id 昇順で「extra_count - keep_extra」件
+        ids_to_delete = [r[0] for r in conn.execute(
+            f"SELECT id FROM quotes WHERE NOT {PROTECTED_CONDITION} ORDER BY id ASC LIMIT ?",
+            (extra_count - keep_extra,)
+        ).fetchall()]
+        if ids_to_delete:
+            placeholders = ','.join('?' * len(ids_to_delete))
+            conn.execute(f"DELETE FROM quote_items WHERE quote_id IN ({placeholders})", ids_to_delete)
+            conn.execute(f"DELETE FROM quotes WHERE id IN ({placeholders})", ids_to_delete)
+
     conn.commit()
     conn.close()
     return jsonify({'success': True, 'ticket': new_ticket})
