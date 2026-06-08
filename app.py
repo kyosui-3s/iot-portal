@@ -5,11 +5,25 @@ import sqlite3
 import os
 import subprocess
 import urllib.request
-from flask import Flask, request, redirect, Response, jsonify, send_from_directory
+from functools import wraps
+from flask import Flask, request, redirect, Response, jsonify, send_from_directory, session
 
 app = Flask(__name__, static_folder='static', static_url_path='')
+app.secret_key = 'demo-not-for-production-3sec-demo-2026'
 DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), 'iot_portal.db'))
 PDF_DIR = os.path.join(os.path.dirname(__file__), 'quote_files')
+
+# ─────────── 認証デコレーター ───────────
+def require_login(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not session.get('user_id'):
+            # API は 401 JSON、画面は / にリダイレクト
+            if request.path.startswith('/api/'):
+                return jsonify({'error': 'authentication required', 'login_required': True}), 401
+            return redirect('/')
+        return f(*args, **kwargs)
+    return wrapper
 
 # ─────────── Database ───────────
 def get_db():
@@ -164,6 +178,7 @@ def index():
 @app.route('/quotes/complete')
 @app.route('/quotes/<int:qid>')
 @app.route('/quotes/<int:qid>/items')
+@require_login
 def spa_pages(cid=None, contact_id=None, qid=None):
     return send_from_directory('static', 'index.html')
 
@@ -232,8 +247,13 @@ def api_login():
         user = conn.execute(sql).fetchone()
         conn.close()
         if user:
+            # Flask session に保存 (以降の認可チェックで使用)
+            session.permanent = True
+            session['user_id'] = user['id']
+            session['email'] = user['email']
+            session['role'] = user['role']
             resp = jsonify({'success': True, 'user': {'id': user['id'], 'email': user['email'], 'name': user['name'], 'role': user['role']}})
-            # VULN: HttpOnly/Secure/SameSite なし
+            # VULN: HttpOnly/Secure/SameSite なし (旧cookieもセット - DAST検出用)
             resp.set_cookie('session_user', email, path='/')
             resp.set_cookie('user_role', user['role'], path='/')
             return resp
@@ -246,6 +266,7 @@ def api_login():
 # REST APIs (顧客)
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/customers')
+@require_login
 def api_customers_list():
     # VULN: SQLi via numeric param (?id=1' で SQL syntax error)
     cid = request.args.get('id', '')
@@ -275,6 +296,7 @@ def api_customers_list():
 
 
 @app.route('/api/customers/<customer_id>')
+@require_login
 def api_customer_detail(customer_id):
     # VULN: SQL Injection in path param + IDOR (認証なし)
     sql = "SELECT * FROM customers WHERE id=" + customer_id
@@ -291,6 +313,7 @@ def api_customer_detail(customer_id):
 
 
 @app.route('/api/customers/<customer_id>/contacts')
+@require_login
 def api_customer_contacts(customer_id):
     # VULN: IDOR (認証なし) + SQLi via path param
     sql = "SELECT * FROM contacts WHERE customer_id=" + customer_id
@@ -305,6 +328,7 @@ def api_customer_contacts(customer_id):
 
 
 @app.route('/api/contacts/<contact_id>')
+@require_login
 def api_contact_detail(contact_id):
     # VULN: IDOR (認証なし) + SQLi via path param
     sql = "SELECT ct.*, c.company AS customer_company FROM contacts ct LEFT JOIN customers c ON ct.customer_id=c.id WHERE ct.id=" + contact_id
@@ -320,6 +344,7 @@ def api_contact_detail(contact_id):
 
 
 @app.route('/api/quotes/<quote_id>/items')
+@require_login
 def api_quote_items(quote_id):
     # VULN: SQLi via path param
     sql = "SELECT * FROM quote_items WHERE quote_id=" + quote_id
@@ -337,6 +362,7 @@ def api_quote_items(quote_id):
 # REST APIs (見積)
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/quotes')
+@require_login
 def api_quotes_list():
     conn = get_db()
     # Q-DEMO は常に最上段に固定、それ以外は id DESC（新しい順）
@@ -348,6 +374,7 @@ def api_quotes_list():
 
 
 @app.route('/api/quotes/<quote_id>')
+@require_login
 def api_quote_detail(quote_id):
     # VULN: SQLi via numeric param + IDOR
     sql = "SELECT q.*, c.company AS customer_company, c.name AS customer_name FROM quotes q LEFT JOIN customers c ON q.customer_id=c.id WHERE q.id=" + quote_id
@@ -364,6 +391,7 @@ def api_quote_detail(quote_id):
 
 
 @app.route('/api/quotes/<quote_id>', methods=['DELETE', 'OPTIONS'])
+@require_login
 def api_quote_delete(quote_id):
     # VULN: 認可チェック無し (任意ユーザーが任意見積を削除可能、CSRFも可能)
     if request.method == 'OPTIONS':
@@ -388,6 +416,7 @@ def api_quote_delete(quote_id):
 
 
 @app.route('/api/quotes/by-ticket/<ticket>')
+@require_login
 def api_quote_by_ticket(ticket):
     # VULN: IDOR (連番 Q-1001..) 認証なし
     conn = get_db()
@@ -407,6 +436,7 @@ def api_quote_by_ticket(ticket):
 # 見積作成フロー（フォームゲート、DAST自動巡回不可）
 # ═══════════════════════════════════════════════════════════
 @app.route('/api/quotes/confirm', methods=['POST', 'OPTIONS'])
+@require_login
 def api_quote_confirm():
     if request.method == 'OPTIONS':
         return '', 204
@@ -417,6 +447,7 @@ def api_quote_confirm():
 
 
 @app.route('/api/quotes/submit', methods=['POST', 'OPTIONS'])
+@require_login
 def api_quote_submit():
     if request.method == 'OPTIONS':
         return '', 204
@@ -462,6 +493,7 @@ def api_quote_submit():
 # 見積 PDF ダウンロード (VULN: Path Traversal / LFI)
 # ═══════════════════════════════════════════════════════════
 @app.route('/quotes/<quote_id>/pdf')
+@require_login
 def quote_pdf(quote_id):
     fname = request.args.get('file', f'quote_Q-1001.pdf')
     # VULN: パス検証なし → /quotes/X/pdf?file=../../etc/passwd で /etc/passwd 読み込み
@@ -512,6 +544,7 @@ body{font-family:'Helvetica Neue',sans-serif;margin:0;background:#f0fdfa;color:#
 </style>"""
 
 @app.route('/quotes/<int:quote_id>/approve', methods=['GET', 'POST'])
+@require_login
 def quote_approve(quote_id):
     conn = get_db()
     quote = conn.execute("""SELECT q.*, c.company AS customer_company FROM quotes q
@@ -644,6 +677,7 @@ def quote_approve(quote_id):
 
 
 @app.route('/quotes/<int:quote_id>/approved')
+@require_login
 def quote_approved(quote_id):
     token = request.args.get('token', '')
     rank = request.args.get('rank', '')
@@ -761,6 +795,7 @@ h1{color:#9a3412;margin:0 0 10px}
 # VULN: SQL Injection (q) + Reflected XSS + MySQL風エラーシグネチャ
 # ═══════════════════════════════════════════════════════════
 @app.route('/search')
+@require_login
 def cross_search():
     q = request.args.get('q', '')
     if not q:
@@ -825,6 +860,7 @@ td{{padding:8px;border-bottom:1px solid #e2e8f0}}</style></head>
 # VULN: OS Command Injection (cmd) + SSRF (fetch_url)
 # ═══════════════════════════════════════════════════════════
 @app.route('/admin/export')
+@require_login
 def admin_export_html():
     fmt = request.args.get('format', '')
     cmd_arg = request.args.get('cmd', '')
