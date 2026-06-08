@@ -17,9 +17,19 @@
 <body class="min-h-screen bg-slate-100">
 <div id="app"></div>
 
-<footer style="border-top:1px solid #e5e7eb;padding:16px 20px;text-align:center;font-size:12px;color:#9ca3af;margin-top:40px">
-  <p>&copy; 2026 DAST Demo Site (見積システム) <a href="/search" style="color:#cbd5e1;font-size:10px;text-decoration:none;margin-left:6px">·</a> <a href="/admin/export" style="color:#cbd5e1;font-size:10px;text-decoration:none">·</a></p>
+<footer id="site-footer" style="border-top:1px solid #e5e7eb;padding:16px 20px;text-align:center;font-size:12px;color:#9ca3af;margin-top:40px">
+  <p>&copy; 2026 DAST Demo Site (見積システム) <a href="/search" style="color:#cbd5e1;font-size:10px;text-decoration:none;margin-left:6px">·</a> <a id="footer-admin-link" href="/admin/export" style="color:#cbd5e1;font-size:10px;text-decoration:none">·</a></p>
 </footer>
+<script>
+  // ロール別: sales には admin リンクのドットを隠す (クライアント側のみ。サーバーは認可なし=脆弱性は維持)
+  try {
+    const u=JSON.parse(localStorage.getItem('user')||'{}');
+    if(u.role && u.role!=='admin'){
+      const el=document.getElementById('footer-admin-link');
+      if(el) el.style.display='none';
+    }
+  } catch(e){}
+</script>
 
 <script>
 const { createApp, ref, reactive, onMounted, watch, computed } = Vue
@@ -29,6 +39,9 @@ const fmt = n => new Intl.NumberFormat('ja-JP').format(n||0)
 const STATUS_LABEL = { draft:'下書き', sent:'送付済', accepted:'受注', rejected:'失注' }
 const STATUS_COLOR = { draft:'bg-gray-400', sent:'bg-blue-500', accepted:'bg-emerald-500', rejected:'bg-red-500' }
 const AVATAR_COLORS = ['bg-rose-500','bg-amber-500','bg-emerald-500','bg-sky-500','bg-violet-500','bg-pink-500','bg-teal-500','bg-orange-500']
+// ロール判定（VULN: クライアント側のみで判定、サーバー側は認可チェック無し）
+const currentRole = () => { try { return (JSON.parse(localStorage.getItem('user')||'{}').role)||'sales' } catch(e){ return 'sales' } }
+const isAdmin = () => currentRole() === 'admin'
 
 /* ─────────── 共通ヘッダー ─────────── */
 const AppHeader = {
@@ -103,7 +116,7 @@ const DashboardPage = {
       <div class="max-w-6xl mx-auto">
         <p class="text-indigo-200 text-xs uppercase tracking-widest">DASHBOARD</p>
         <h1 class="text-3xl font-black text-white mt-1">ダッシュボード</h1>
-        <p class="text-indigo-200 text-sm mt-2">{{user?.name||'ゲスト'}}さん、こんにちは</p>
+        <p class="text-indigo-200 text-sm mt-2">{{user?.name||'ゲスト'}}さん、こんにちは <span class="ml-2 px-2 py-0.5 rounded text-xs font-bold" :class="user?.role==='admin'?'bg-red-500 text-white':'bg-blue-400 text-white'">{{user?.role==='admin'?'管理者':'営業'}}</span></p>
       </div>
     </div>
     <main class="max-w-6xl mx-auto px-6 -mt-6">
@@ -209,7 +222,7 @@ const CustomersPage = {
         <div v-if="errorHtml" class="m-4 p-3 bg-red-50 border-2 border-red-200 text-red-700 rounded" v-html="errorHtml"></div>
         <table class="w-full text-sm">
           <thead><tr class="bg-emerald-800 text-white">
-            <th class="text-left px-4 py-3">ID</th><th class="text-left px-4 py-3">会社名</th><th class="text-left px-4 py-3">業種</th><th class="text-left px-4 py-3">担当者</th><th class="text-left px-4 py-3">メール</th><th class="text-right px-4 py-3">売上規模</th><th></th>
+            <th class="text-left px-4 py-3">ID</th><th class="text-left px-4 py-3">会社名</th><th class="text-left px-4 py-3">業種</th><th class="text-left px-4 py-3">担当者</th><th class="text-left px-4 py-3">メール</th><th v-if="isAdmin" class="text-right px-4 py-3">売上規模</th><th></th>
           </tr></thead>
           <tbody>
             <tr v-for="c in customers" :key="c.id" class="border-b border-emerald-100 hover:bg-emerald-50">
@@ -218,7 +231,7 @@ const CustomersPage = {
               <td class="px-4 py-3"><span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-bold">{{c.industry}}</span></td>
               <td class="px-4 py-3">{{c.name}}</td>
               <td class="px-4 py-3 text-gray-600">{{c.email}}</td>
-              <td class="px-4 py-3 text-right font-mono">¥{{fmt(c.annual_revenue)}}</td>
+              <td v-if="isAdmin" class="px-4 py-3 text-right font-mono">¥{{fmt(c.annual_revenue)}}</td>
               <td class="px-4 py-3"><router-link :to="'/customers/'+c.id" class="text-emerald-700 text-xs font-bold underline">詳細 →</router-link></td>
             </tr>
           </tbody>
@@ -237,7 +250,7 @@ const CustomersPage = {
     }
     onMounted(doSearch)
     function logout(){localStorage.removeItem('user');window.location.href='/'}
-    return {search,customers,errorHtml,doSearch,logout,fmt}
+    return {search,customers,errorHtml,doSearch,logout,fmt,isAdmin:isAdmin()}
   }
 }
 
@@ -272,7 +285,7 @@ const CustomerDetailPage = {
             <p><span class="text-gray-400">📞</span> {{customer.phone}}</p>
             <p><span class="text-gray-400">📍</span> {{customer.address}}</p>
           </div>
-          <div class="mt-4 pt-3 border-t">
+          <div v-if="isAdmin" class="mt-4 pt-3 border-t">
             <p class="text-xs text-gray-500 mb-1">売上規模</p>
             <p class="text-2xl font-black text-cyan-700">¥{{fmt(customer.annual_revenue)}}</p>
           </div>
@@ -329,7 +342,7 @@ const CustomerDetailPage = {
     }
     onMounted(load); watch(()=>route.params.cid, load)
     function logout(){localStorage.removeItem('user');window.location.href='/'}
-    return {customer,contacts,relatedQuotes,error,logout,fmt,STATUS_LABEL,STATUS_COLOR,AVATAR_COLORS}
+    return {customer,contacts,relatedQuotes,error,logout,fmt,STATUS_LABEL,STATUS_COLOR,AVATAR_COLORS,isAdmin:isAdmin()}
   }
 }
 
@@ -506,7 +519,7 @@ const QuotesPage = {
               <td class="px-4 py-3 text-xs text-gray-500 truncate" :title="q.valid_until">{{q.valid_until}}</td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <router-link :to="'/quotes/'+q.id" class="text-violet-700 text-xs underline mr-3">詳細</router-link>
-                <button @click="deleteQuote(q)" class="text-red-600 text-xs underline">削除</button>
+                <button v-if="isAdmin" @click="deleteQuote(q)" class="text-red-600 text-xs underline">削除</button>
               </td>
             </tr>
           </tbody>
@@ -534,7 +547,7 @@ const QuotesPage = {
     }
     onMounted(load)
     function logout(){localStorage.removeItem('user');window.location.href='/'}
-    return {quotes,displayedQuotes,showAll,displayLimit,deleteQuote,logout,fmt,STATUS_LABEL,STATUS_COLOR}
+    return {quotes,displayedQuotes,showAll,displayLimit,deleteQuote,logout,fmt,STATUS_LABEL,STATUS_COLOR,isAdmin:isAdmin()}
   }
 }
 
@@ -602,7 +615,7 @@ const QuoteDetailPage = {
             <router-link :to="'/quotes/'+quote.id+'/items'" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-bold text-sm">📦 明細を見る ({{items.length}})</router-link>
             <a :href="'/quotes/'+quote.id+'/pdf?file=quote_'+quote.ticket+'.pdf'" target="_blank" class="px-5 py-2.5 bg-amber-600 text-white rounded-lg font-bold text-sm">📄 PDF</a>
             <a v-if="quote.ticket==='Q-DEMO'" :href="'/quotes/'+quote.id+'/approve'" class="px-5 py-2.5 bg-teal-700 text-white rounded-lg font-bold text-sm">🔐 上長承認を申請</a>
-            <button @click="deleteQuote" class="ml-auto px-5 py-2.5 bg-red-600 text-white rounded-lg font-bold text-sm">🗑 削除</button>
+            <button v-if="isAdmin" @click="deleteQuote" class="ml-auto px-5 py-2.5 bg-red-600 text-white rounded-lg font-bold text-sm">🗑 削除</button>
           </div>
         </div>
       </div>
@@ -629,7 +642,7 @@ const QuoteDetailPage = {
       if(j.success) router.push('/quotes'); else alert('削除失敗')
     }
     function logout(){localStorage.removeItem('user');window.location.href='/'}
-    return {quote,items,error,deleteQuote,logout,fmt,STATUS_LABEL,STATUS_COLOR}
+    return {quote,items,error,deleteQuote,logout,fmt,STATUS_LABEL,STATUS_COLOR,isAdmin:isAdmin()}
   }
 }
 
